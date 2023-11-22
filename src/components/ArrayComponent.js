@@ -67,7 +67,7 @@ const ArrayComponent = () => {
 
   return (
     <div className="container mt-4">
-  <h2>Books</h2>
+  <h2>Library Books</h2>
       <div  className="d-flex">
       <Button variant="primary" className="ms-auto" onClick={() => handleShowModal({ id: null, title: '', author: '' })}>
       Add Book
