@@ -1,6 +1,6 @@
 import logo from './logo.svg';
 import './App.css';
-import MFundData from './components/MFundData'
+import ArrayComponent from './components/ArrayComponent'
 
 function App() {
   return (
@@ -19,7 +19,7 @@ function App() {
           Learn React
         </a>
       </header> */}
-      <MFundData />
+      <ArrayComponent />
     </div>
   );
 }
