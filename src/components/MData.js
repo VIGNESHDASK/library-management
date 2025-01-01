@@ -6,7 +6,7 @@ const MData = () => {
   const [fundData, setFundData] = useState([]);
 
   const FundUrls = [
-    'https://api.mfapi.in/mf/149039', // 50
+    'https://api.mfapi.in/mf/149039',  // 50
     'https://api.mfapi.in/mf/150443',  // fin
     'https://api.mfapi.in/mf/145552',  // nas
     'https://api.mfapi.in/mf/152535',  // it
@@ -18,7 +18,8 @@ const MData = () => {
     'https://api.mfapi.in/mf/151814',  // micro
     'https://api.mfapi.in/mf/152521',  // realty 
     'https://api.mfapi.in/mf/152214',  // health
-    'https://api.mfapi.in/mf/120684'   // next
+    'https://api.mfapi.in/mf/120684' , // next
+    "https://api.mfapi.in/mf/149804"   // bank
     // Add more URLs as needed
   ];
 
