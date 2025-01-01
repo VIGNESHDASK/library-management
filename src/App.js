@@ -1,6 +1,7 @@
 import logo from './logo.svg';
 import './App.css';
 import ArrayComponent from './components/ArrayComponent'
+import MData from './components/MData'
 
 function App() {
   return (
@@ -19,7 +20,7 @@ function App() {
           Learn React
         </a>
       </header> */}
-      <ArrayComponent />
+      <MData />
     </div>
   );
 }
