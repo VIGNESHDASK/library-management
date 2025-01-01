@@ -7,19 +7,19 @@ const MData = () => {
 
   const FundUrls = [
     'https://api.mfapi.in/mf/149039',  // 50
-    'https://api.mfapi.in/mf/150443',  // fin
-    'https://api.mfapi.in/mf/145552',  // nas
-    'https://api.mfapi.in/mf/152535',  // it
-    'https://api.mfapi.in/mf/150930',  // ph
+    "https://api.mfapi.in/mf/149804",  // bank
+    'https://api.mfapi.in/mf/151726',  // smal
     'https://api.mfapi.in/mf/147622',  // mid
+    'https://api.mfapi.in/mf/152535',  // it
+    'https://api.mfapi.in/mf/145552',  // nas
+    'https://api.mfapi.in/mf/150930',  // ph
+    'https://api.mfapi.in/mf/150443',  // fin
+    'https://api.mfapi.in/mf/151814',  // micro
+    'https://api.mfapi.in/mf/152214',  // health
+    'https://api.mfapi.in/mf/152521',  // realty 
     'https://api.mfapi.in/mf/152557',  // auto
     'https://api.mfapi.in/mf/150515',  // man
-    'https://api.mfapi.in/mf/151726',  // smal
-    'https://api.mfapi.in/mf/151814',  // micro
-    'https://api.mfapi.in/mf/152521',  // realty 
-    'https://api.mfapi.in/mf/152214',  // health
-    'https://api.mfapi.in/mf/120684' , // next
-    "https://api.mfapi.in/mf/149804"   // bank
+    'https://api.mfapi.in/mf/120684',  // next
     // Add more URLs as needed
   ];
 
@@ -43,8 +43,8 @@ const MData = () => {
     const sixMonthStart = new Date();
     sixMonthStart.setMonth(end.getMonth() - 6);
 
-    // Fetch data for each  fund
-    for (const url of FundUrls) {
+    // Fetch data for each fund
+    for (const [index, url] of FundUrls.entries()) {
       try {
         const response = await axios.get(url);
         const apiData = response.data.data;
@@ -68,6 +68,7 @@ const MData = () => {
         };
 
         fetchedData.push({
+          id: index + 1,
           fundName: response.data.meta.scheme_name,
           oneMonth: processData(oneMonthStart),
           twoMonths: processData(twoMonthStart),
@@ -94,6 +95,10 @@ const MData = () => {
 
   const columns = React.useMemo(
     () => [
+      {
+        Header: 'ID',
+        accessor: 'id',
+      },
       {
         Header: 'Fund Name',
         accessor: 'fundName',
@@ -140,7 +145,7 @@ const MData = () => {
 
   return (
     <div>
-      <h2> Fund Data (Last 6 Months)</h2>
+      <h2>Fund Data (Last 6 Months)</h2>
       <table {...getTableProps()} style={{ borderCollapse: 'collapse', width: '100%', marginTop: '20px' }}>
         <thead>
           {headerGroups.map(headerGroup => (
