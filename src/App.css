@@ -71,8 +71,6 @@
   background-color: #c8ba53;
 }
 
-
-/* App.css */
 .tiles-container {
   display: grid;
   grid-template-columns: 1fr;
@@ -94,6 +92,7 @@
   text-decoration: none;
   color: #333;
   flex-grow: 1; /* Allow tiles to grow and fill space equally */
+  transition: background-color 0.3s ease; /* Smooth transition effect */
 }
 
 .tile:hover {
@@ -102,18 +101,30 @@
 
 @media (min-width: 600px) {
   .tiles-container {
-    grid-template-columns: 1fr; /* Still single column on smaller desktops */
+    grid-template-columns: repeat(2, 1fr); /* Two columns for tablets and small desktops */
   }
 
   .tile {
     padding: 30px; /* Increased padding for desktop view */
-    font-size: 3rem; /* Increased font size for desktop view */
+    font-size: 1.5rem; /* Slightly increased font size for tablets */
   }
 }
 
+@media (min-width: 1024px) {
+  .tiles-container {
+    grid-template-columns: repeat(3, 1fr); /* Three columns for larger desktops */
+  }
+
+  .tile {
+    padding: 40px; /* Increased padding for large desktop view */
+    font-size: 2rem; /* Increased font size for desktop view */
+  }
+}
+
+
 /* TodoComponent.css */
 .todo-container {
-  max-width: 400px;
+  max-width: 200px;
   margin: 0 auto;
   padding: 20px;
   border: 1px solid #ccc;
