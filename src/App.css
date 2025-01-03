@@ -73,12 +73,12 @@
 
 
 /* App.css */
-/* App.css */
 .tiles-container {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
   padding: 10px;
+  height: 100vh; /* Ensures the container takes up the full height of the viewport */
 }
 
 .tile {
@@ -88,21 +88,41 @@
   background-color: #f0f0f0;
   border: 1px solid #ccc;
   border-radius: 8px;
-  padding: 30px; /* Increased padding for a medium tile size */
+  padding: 20px; /* Padding for mobile view */
   text-align: center;
-  font-size: 1.5rem; /* Increased font size */
+  font-size: 1.2rem; /* Font size for mobile view */
   text-decoration: none;
   color: #333;
+  flex-grow: 1; /* Allow tiles to grow and fill space equally */
 }
 
 .tile:hover {
   background-color: #e0e0e0;
 }
 
+@media (min-width: 600px) {
+  .tiles-container {
+    grid-template-columns: 1fr; /* Still single column on smaller desktops */
+  }
 
-@media (max-width: 600px) {
-  .tile { padding: 30px; /* Increased padding for desktop view */ font-size: 1.5rem; /* Increased font size for desktop view */ }
+  .tile {
+    padding: 30px; /* Increased padding for desktop view */
+    font-size: 1.5rem; /* Increased font size for desktop view */
+  }
 }
+
+@media (min-width: 900px) {
+  .tiles-container {
+    grid-template-columns: 1fr 1fr; /* Two columns on larger screens */
+  }
+}
+
+@media (min-width: 1200px) {
+  .tiles-container {
+    grid-template-columns: 1fr 1fr 1fr; /* Three columns on even larger screens */
+  }
+}
+
 
 /* TodoComponent.css */
 .todo-container {
