@@ -6,20 +6,20 @@ const MData = () => {
   const [fundData, setFundData] = useState([]);
 
   const FundUrls = [
-    'https://api.mfapi.in/mf/149039',  // 50
-    "https://api.mfapi.in/mf/149804",  // bank
-    'https://api.mfapi.in/mf/151726',  // smal
-    'https://api.mfapi.in/mf/147622',  // mid
-    'https://api.mfapi.in/mf/152535',  // it
-    'https://api.mfapi.in/mf/145552',  // nas
-    'https://api.mfapi.in/mf/150930',  // ph
-    'https://api.mfapi.in/mf/150443',  // fin
-    'https://api.mfapi.in/mf/151814',  // micro
-    'https://api.mfapi.in/mf/152214',  // health
-    'https://api.mfapi.in/mf/152521',  // realty 
-    'https://api.mfapi.in/mf/152557',  // auto
-    'https://api.mfapi.in/mf/150515',  // man
-    'https://api.mfapi.in/mf/120684',  // next
+    'https://api.mfapi.in/mf/149039', // 50
+    'https://api.mfapi.in/mf/149804', // bank
+    'https://api.mfapi.in/mf/151726', // smal
+    'https://api.mfapi.in/mf/147622', // mid
+    'https://api.mfapi.in/mf/152535', // it
+    'https://api.mfapi.in/mf/145552', // nas
+    'https://api.mfapi.in/mf/150930', // ph
+    'https://api.mfapi.in/mf/150443', // fin
+    'https://api.mfapi.in/mf/151814', // micro
+    'https://api.mfapi.in/mf/152214', // health
+    'https://api.mfapi.in/mf/152521', // realty
+    'https://api.mfapi.in/mf/152557', // auto
+    'https://api.mfapi.in/mf/150515', // man
+    'https://api.mfapi.in/mf/120684', // next
     // Add more URLs as needed
   ];
 
@@ -49,7 +49,7 @@ const MData = () => {
         const response = await axios.get(url);
         const apiData = response.data.data;
 
-        const processData = (startDate) => {
+        const processData = startDate => {
           const filteredData = apiData.filter(entry => {
             const entryDate = new Date(entry.date.split('-').reverse().join('-'));
             return entryDate >= startDate && entryDate <= end;
@@ -63,7 +63,7 @@ const MData = () => {
           return {
             percentageDifference: percentageDifference.toFixed(2),
             maxNav,
-            latestNav
+            latestNav,
           };
         };
 
@@ -75,6 +75,7 @@ const MData = () => {
           threeMonths: processData(threeMonthStart),
           fourMonths: processData(fourMonthStart),
           sixMonths: processData(sixMonthStart),
+          dummyValue: '' // Add a dummy value
         });
       } catch (error) {
         console.error(`Error fetching data from ${url}:`, error);
@@ -88,10 +89,7 @@ const MData = () => {
     fetchData();
   }, []);
 
-  const data = React.useMemo(
-    () => fundData,
-    [fundData]
-  );
+  const data = React.useMemo(() => fundData, [fundData]);
 
   const columns = React.useMemo(
     () => [
@@ -131,22 +129,20 @@ const MData = () => {
         Header: '6 Months',
         accessor: 'sixMonths.percentageDifference',
       },
+      {
+        Header: '######', // Add a new column for dummy value
+        accessor: 'dummyValue'
+      }
     ],
     []
   );
 
-  const {
-    getTableProps,
-    getTableBodyProps,
-    headerGroups,
-    rows,
-    prepareRow,
-  } = useTable({ columns, data }, useSortBy);
+  const { getTableProps, getTableBodyProps, headerGroups, rows, prepareRow } = useTable({ columns, data }, useSortBy);
 
   return (
     <div>
       <h2>Fund Data (Last 6 Months)</h2>
-      <table {...getTableProps()} style={{ borderCollapse: 'collapse', width: '100%', marginTop: '20px' }}>
+      <table {...getTableProps()} style={{ borderCollapse: 'collapse', width: '100%', marginTop: '20px', marginRight: '20px' }}>
         <thead>
           {headerGroups.map(headerGroup => (
             <tr {...headerGroup.getHeaderGroupProps()}>
@@ -156,13 +152,7 @@ const MData = () => {
                   style={{ border: '1px solid black', padding: '8px', cursor: 'pointer' }}
                 >
                   {column.render('Header')}
-                  <span>
-                    {column.isSorted
-                      ? column.isSortedDesc
-                        ? ' 🔽'
-                        : ' 🔼'
-                      : ''}
-                  </span>
+                  <span>{column.isSorted ? (column.isSortedDesc ? ' 🔽' : ' 🔼') : ''}</span>
                 </th>
               ))}
             </tr>

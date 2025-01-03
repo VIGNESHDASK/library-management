@@ -107,22 +107,9 @@
 
   .tile {
     padding: 30px; /* Increased padding for desktop view */
-    font-size: 1.5rem; /* Increased font size for desktop view */
+    font-size: 3rem; /* Increased font size for desktop view */
   }
 }
-
-@media (min-width: 900px) {
-  .tiles-container {
-    grid-template-columns: 1fr 1fr; /* Two columns on larger screens */
-  }
-}
-
-@media (min-width: 1200px) {
-  .tiles-container {
-    grid-template-columns: 1fr 1fr 1fr; /* Three columns on even larger screens */
-  }
-}
-
 
 /* TodoComponent.css */
 .todo-container {
