@@ -3,12 +3,6 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Switch, Link } from 'react-router-dom';
 import '../App.css'; // Ensure to style appropriately
 
-// Define the individual components to navigate to
-const ComponentOne = () => <div>Component One</div>;
-const ComponentTwo = () => <div>Component Two</div>;
-const ComponentThree = () => <div>Component Three</div>;
-const ComponentFour = () => <div>Component Four</div>;
-const ComponentFive = () => <div>Component five</div>;
 
 
 // Define the Main Tiles Component
