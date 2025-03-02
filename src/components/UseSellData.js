@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
-const useFundData = (urls) => {
+const useSellData = (urls) => {
   const [fundData, setFundData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,7 +40,7 @@ const useFundData = (urls) => {
           const ALL_TIME_MAX_NAV = navValues.length > 0 ? Math.max(...navValues) : 0;
 
           const processData = (daysAgo) => {
-            let startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() , currentDate.getDate()- daysAgo);
+            let startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() - daysAgo);
             startDate = getClosestDate(startDate, apiData);
 
             const filteredData = apiData.filter(entry => parseDate(entry.date) >= startDate);
@@ -52,18 +52,16 @@ const useFundData = (urls) => {
 
             const latestNav = filteredData.length > 0 ? parseFloat(filteredData[0].nav) : 0;
           
-            const monthMax = Math.max(...filteredData.map(entry => parseFloat(entry.nav)));
+            const weekMin = Math.min(...filteredData.map(entry => parseFloat(entry.nav)));
             const closeNav = closestEntryBeforeStartDate ? parseFloat(closestEntryBeforeStartDate.nav) : 0;
-            const percentageDifference = monthMax !== 0 ? ((monthMax-latestNav) / monthMax) * 100 : 0;
+            const percentageDifference = weekMin !== 0 ? (( latestNav - weekMin) / weekMin) * 100 : 0;
 
             return {
-             percentageDifference: percentageDifference.toFixed(2)  ,
+              percentageDifference: percentageDifference.toFixed(2) ,
               maxNav: ALL_TIME_MAX_NAV,
               latestNav,
             };
           };
-
-          
 
           const data = { id: index + 1, fundName: response.data.meta.scheme_name, dummyValue: '' };
           data['oneWeek'] = processData(7);
@@ -90,4 +88,4 @@ const useFundData = (urls) => {
   return { fundData, loading };
 };
 
-export default useFundData;
+export default useSellData;

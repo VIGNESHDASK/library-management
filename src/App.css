@@ -1,8 +1,9 @@
 #root {
-  max-width: 1280px;
+  max-width: 80rem;
   margin: 0 auto;
-  padding: 2rem;
+  padding-bottom: 2rem;
   text-align: center;
+  /* background-color: #3c4f60; */
 }
 
 .logo {
@@ -11,9 +12,11 @@
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
@@ -31,6 +34,18 @@
   a:nth-of-type(2) .logo {
     animation: logo-spin infinite 20s linear;
   }
+}
+
+.form-button {
+  display: flex;
+  justify-content: flex-start; /* Aligns the button to the left */
+  margin-bottom: 2rem;
+  margin-top: 10px;
+  color: #218838;
+}
+
+.add-row-form {
+  padding: 2rem;
 }
 
 .card {
@@ -73,68 +88,77 @@
 
 .tiles-container {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 80px;
+  grid-template-columns: 1fr; /* Default: Single column on mobile */
+  gap: 30px;
   padding: 20px;
-  height: 70vh; /* Ensures the container takes up the full height of the viewport */
+  /* min-height: 100vh;  */
+  /* background-color: #3c4f60; */
 }
 
+/* Two columns per row on screens wider than 375px */
+@media (min-width: 375px) {
+  .tiles-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Ensure minimum height for each tile */
 .tile {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #f0f0f0;
+  background-color: #376c58;
   border: 1px solid #ccc;
   border-radius: 8px;
-  padding: 20px; /* Padding for mobile view */
+  padding: 20px;
   text-align: center;
-  font-size: 1.2rem; /* Font size for mobile view */
+  font-size: 1.2rem;
   text-decoration: none;
-  color: #333;
-  flex-grow: 1; /* Allow tiles to grow and fill space equally */
-  transition: background-color 0.3s ease; /* Smooth transition effect */
+  color: white;
+  flex-grow: 0; /* Prevents stretching */
+  flex-shrink: 1; /* Allows shrinking if needed */
+  transition: background-color 0.3s ease;
+  min-height: 150px; /* Reasonable minimum height */
+  height: auto; /* Adapts to content */
+  max-height: 150px; /* Prevents tiles from being too large */
 }
 
+.quotes-container {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-left: 5px solid #376c58;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  font-style: italic;
+  color: #333;
+}
+
+.quotes-container p {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+
+
 .tile:hover {
-  background-color: #e0e0e0;
+  background-color: rgba(38, 35, 35, 0.902); /* Softer hover effect */
 }
 
 @media (min-width: 600px) {
   .tile {
     padding: 30px; /* Increased padding for larger devices */
-    font-size: 1.5rem; /* Adjusted font size for larger devices */
+    font-size: 1.5rem;
   }
 }
 
 @media (min-width: 1024px) {
   .tile {
     padding: 60px; /* Increased padding for large desktop view */
-    font-size: 4rem; /* Increased font size for desktop view */
+    font-size: 4rem;
   }
 }
 
-
-/* TodoComponent.css */
-.todo-container {
-  max-width: 200px;
-  margin: 0 auto;
-  padding: 20px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  background-color: #fff;
-  text-align: center;
- 
-}
-
-.todo-input {
-  width: 80%;
-  padding: 10px;
-  margin-bottom: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 16px;
-}
 
 .add-button {
   padding: 10px 20px;
@@ -150,6 +174,47 @@
   background-color: #218838;
 }
 
+.todo-input-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.todo-container {
+  max-width: 21.875rem;
+  margin: 0 auto;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+  text-align: center;
+}
+
+.todo-list .todo-number {
+  margin-right: 10px;
+  font-weight: bold;
+  color: #333;
+}
+
+.todo-list .remove-button {
+  margin: 10px 10px;
+  padding: 5px 10px;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.todo-input {
+  width: 80%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+
+
 .todo-list {
   list-style-type: none;
   padding: 0;
@@ -157,12 +222,82 @@
 }
 
 .todo-item {
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+  background-color: #f4f4f4;
   padding: 10px;
-  border-bottom: 1px solid #ccc;
-  font-size: 16px;
+  border-radius: 5px;
+  width: 100%;
+  max-width: 25rem; /* Adjusted for responsiveness */
+  justify-content: center;
+}
+
+.todo-number {
+  margin-right: 10px;
+  font-weight: bold;
+  color: #333;
+}
+
+.todo-text {
+  flex-grow: 1;
+  text-align: center;
 }
 
 .todo-item:last-child {
   border-bottom: none;
 }
 
+.todo-details, .date-input {
+  margin-top: 10px;
+  background-color: #e9ecef;
+  padding: 10px;
+  border-radius: 5px;
+  width: 100%;
+  display: block;
+  max-height: 233px;
+  overflow: auto;
+  transition: max-height 0.5s ease-in-out; /* Improved animation */
+}
+
+.todo-detail-input {
+  width: 100%;
+  height: 100px;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.select-box {
+  word-wrap: normal;
+  width: 100%;
+  margin: 5px 0;
+  padding: 10px;
+}
+
+.score {
+  font-family: 'Arial', sans-serif;
+  font-size: 1rem;
+  color: #333;
+  background-color: #f4f4f4;
+  padding: 20px;
+  margin: 19px auto;
+  border-radius: 10px;
+  width: fit-content;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.score span {
+  display: block;
+  margin-top: 10px;
+  font-weight: bold;
+  color: #ff6347;
+}
+
+.score .result {
+  font-style: italic;
+  color: #2e8b57;
+}

@@ -8,6 +8,8 @@ const FundTable = React.memo(({ data }) => {
       { Header: 'Fund Name', accessor: 'fundName' },
       { Header: 'Max NAV', accessor: 'oneMonth.maxNav' },
       { Header: 'Last Price', accessor: 'oneMonth.latestNav' },
+      { Header: '1 Week', accessor: 'oneWeek.percentageDifference' },
+      { Header: '2 Week', accessor: 'twoWeek.percentageDifference' },
       { Header: '1 Month', accessor: 'oneMonth.percentageDifference' },
       { Header: '2 Months', accessor: 'twoMonths.percentageDifference' },
       { Header: '3 Months', accessor: 'threeMonths.percentageDifference' },
