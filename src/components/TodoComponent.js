@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import '../App.css';
 import Scoreboard from './Scoreboard';
+import { MdDelete, MdDriveFileMove } from "react-icons/md";
 
 const TodoComponent = ({ filter, name }) => {
   const initialTodos = JSON.parse(localStorage.getItem(filter)) || [];
@@ -13,12 +14,56 @@ const TodoComponent = ({ filter, name }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [todoDetails, setTodoDetails] = useState(initialDetails);
   const [todoDates, setTodoDates] = useState(initialDates);
+  const [isBucket, setIsBucket] = useState(false);
+  const [isToday, setIsToday] = useState(false);
+
+  // State for bucket and today filters
+  const [todayFilterTodos, setTodayFilterTodos] = useState([]);
+  const [todayFilterTodoDetails, setTodayFilterTodoDetails] = useState([]);
+  const [todayFilterTodoDates, setTodayFilterTodoDates] = useState([]);
+  const [bucketFilterTodos, setBucketFilterTodos] = useState([]);
+  const [bucketFilterTodoDetails, setBucketFilterTodoDetails] = useState([]);
+  const [bucketFilterTodoDates, setBucketFilterTodoDates] = useState([]);
 
   useEffect(() => {
     localStorage.setItem(filter, JSON.stringify(todos));
     localStorage.setItem(`${filter}-details`, JSON.stringify(todoDetails));
     localStorage.setItem(`${filter}-dates`, JSON.stringify(todoDates));
   }, [todos, todoDetails, todoDates, filter]);
+
+  useEffect(() => {
+    if (filter === "bucket") {
+      setIsBucket(true);
+      setTodayFilterTodos(JSON.parse(localStorage.getItem("today")) || []);
+      setTodayFilterTodoDetails(JSON.parse(localStorage.getItem("today-details")) || []);
+      setTodayFilterTodoDates(JSON.parse(localStorage.getItem("today-dates")) || []);
+    }
+
+    if (filter === "today") {
+      setIsToday(true);
+      setBucketFilterTodos(JSON.parse(localStorage.getItem("bucket")) || []);
+      setBucketFilterTodoDetails(JSON.parse(localStorage.getItem("bucket-details")) || []);
+      setBucketFilterTodoDates(JSON.parse(localStorage.getItem("bucket-dates")) || []);
+    }
+  }, [filter]);
+
+  // Save updated today filter when bucket is used
+  useEffect(() => {
+    if (isBucket) {
+      localStorage.setItem("today", JSON.stringify(todayFilterTodos));
+      localStorage.setItem("today-details", JSON.stringify(todayFilterTodoDetails));
+      localStorage.setItem("today-dates", JSON.stringify(todayFilterTodoDates));
+    }
+  }, [todayFilterTodos, todayFilterTodoDetails, todayFilterTodoDates, isBucket]);
+
+  // Save updated today filter when today is used
+  useEffect(() => {
+    if (isToday) {
+      localStorage.setItem("bucket", JSON.stringify(bucketFilterTodos));
+      localStorage.setItem("bucket-details", JSON.stringify(bucketFilterTodoDetails));
+      localStorage.setItem("bucket-dates", JSON.stringify(bucketFilterTodoDates));
+    }
+  }, [bucketFilterTodos, bucketFilterTodoDetails, bucketFilterTodoDates, isToday]);
 
   const addTodo = () => {
     if (inputValue.trim() !== '') {
@@ -31,7 +76,7 @@ const TodoComponent = ({ filter, name }) => {
   };
 
   const removeTodo = (index) => {
-    const confim  = window.confirm('Confirm to Remove from List. ' )
+    const confim = window.confirm('Confirm to Remove from List. ')
 
     if (!confim) return;
 
@@ -44,6 +89,25 @@ const TodoComponent = ({ filter, name }) => {
     setTodoDetails(newDetails);
     setTodoDates(newDates);
     setExpandedIndex(null);
+  };
+
+  const moveTodo = (index) => {
+    
+
+    if (filter === "bucket") {
+      setTodayFilterTodos([...todayFilterTodos, todos[index]]);
+      setTodayFilterTodoDetails([...todayFilterTodoDetails, todoDetails[index]]);
+      setTodayFilterTodoDates([...todayFilterTodoDates, todoDates[index]]);
+    }
+
+    if (filter === "today") {
+      console.warn('today');
+      
+      setBucketFilterTodos([...bucketFilterTodos, todos[index]]);
+      setBucketFilterTodoDetails([...bucketFilterTodoDetails, todoDetails[index]]);
+      setBucketFilterTodoDates([...bucketFilterTodoDates, todoDates[index]]);
+    }
+    removeTodo(index);
   };
 
   const toggleTodoDetails = (index) => {
@@ -86,67 +150,76 @@ const TodoComponent = ({ filter, name }) => {
 
   return (
     <>
-    <Scoreboard score={todos.length}/>
+      <Scoreboard score={todos.length} />
 
-    <div className="todo-container">
-      <h1>{name}</h1>
-      <div className="todo-input-container">
-        <input
-          type="text"
-          placeholder="Add a new todo..."
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') addTodo(); }}
-          className="todo-input"
-        />
-        <button onClick={addTodo} className="add-button">Add</button>
-      </div>
-      <DragDropContext onDragEnd={handleOnDragEnd}>
-        <Droppable droppableId="todos">
-          {(provided) => (
-            <ul {...provided.droppableProps} ref={provided.innerRef} className="todo-list">
-              {todos.map((todo, index) => (
-                <Draggable key={index} draggableId={index.toString()} index={index}>
-                  {(provided) => (
-                    <li
-                    {...provided.draggableProps}
-                    {...provided.dragHandleProps}
-                    ref={provided.innerRef}
-                    className="todo-item"
-                  >
-                    <span className="todo-number">{index + 1}.</span>
-                    <span onClick={() => toggleTodoDetails(index)} className="todo-text">{todo}</span>
-                    {expandedIndex !== index && (
-                        <button onClick={() => removeTodo(index)} className="remove-button">
-                          Remove
-                        </button>
-                      )}
-                    {expandedIndex === index && (
-                      <div className="todo-details">
-                        <textarea
-                          value={todoDetails[index] || ''}
-                          onChange={(e) => handleDetailChange(e, index)}
-                          placeholder="Edit todo details..."
-                          className="todo-detail-input"
-                        />
-                        <input
-                          type="date"
-                          value={todoDates[index] || new Date().toISOString().split('T')[0]}
-                          onChange={(e) => handleDateChange(e, index)}
-                          className="date-input"
-                        />
-                      </div>
+      <div className="todo-container">
+        <h1>{name}</h1>
+        <div className="todo-input-container">
+          <input
+            type="text"
+            placeholder="Add a new todo..."
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') addTodo(); }}
+            className="todo-input"
+          />
+          <button onClick={addTodo} className="add-button">Add</button>
+        </div>
+        <DragDropContext onDragEnd={handleOnDragEnd}>
+          <Droppable droppableId="todos">
+            {(provided) => (
+              <ul {...provided.droppableProps} ref={provided.innerRef} className="todo-list">
+                {todos.map((todo, index) => (
+                  <Draggable key={index} draggableId={index.toString()} index={index}>
+                    {(provided) => (
+                      <li
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                        ref={provided.innerRef}
+                        className="todo-item"
+                      >
+                        <span className="todo-number">{index + 1}.</span>
+                        <span onClick={() => toggleTodoDetails(index)} className="todo-text">{todo}</span>
+                        {expandedIndex !== index && (
+                          isBucket || isToday ? (
+                            <>
+                              <MdDriveFileMove onClick={() => moveTodo(index)} size={20} className="move-icon" />
+                              <MdDelete onClick={() => removeTodo(index)} size={20} className="delete-icon" />
+                            </>
+
+                          )
+                            : (
+                              <button onClick={() => removeTodo(index)} className="remove-button">
+                                Remove
+                              </button>
+                            )
+                        )}
+                        {expandedIndex === index && (
+                          <div className="todo-details">
+                            <textarea
+                              value={todoDetails[index] || ''}
+                              onChange={(e) => handleDetailChange(e, index)}
+                              placeholder="Edit todo details..."
+                              className="todo-detail-input"
+                            />
+                            <input
+                              type="date"
+                              value={todoDates[index] || new Date().toISOString().split('T')[0]}
+                              onChange={(e) => handleDateChange(e, index)}
+                              className="date-input"
+                            />
+                          </div>
+                        )}
+                      </li>
                     )}
-                  </li>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </ul>
-          )}
-        </Droppable>
-      </DragDropContext>
-    </div>
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </ul>
+            )}
+          </Droppable>
+        </DragDropContext>
+      </div>
     </>
   );
 };
