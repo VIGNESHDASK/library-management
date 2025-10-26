@@ -2,84 +2,330 @@ import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import '../App.css';
 import Scoreboard from './Scoreboard';
-import { MdDelete, MdDriveFileMove } from "react-icons/md";
+import { MdDelete, MdDriveFileMove, MdContentCopy } from "react-icons/md";
+
+// Custom hook for localStorage management
+const useLocalStorage = (key, initialValue) => {
+  const [value, setValue] = useState(() => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.error(`Error reading localStorage key "${key}":`, error);
+      return initialValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error setting localStorage key "${key}":`, error);
+    }
+  }, [key, value]);
+
+  return [value, setValue];
+};
+
+// Custom hook for managing daily achievement count
+const useDailyAchievementCount = (filter) => {
+  const today = new Date().toISOString().split('T')[0];
+  const [achievementData, setAchievementData] = useLocalStorage(`${filter}-achievements`, {
+    date: today,
+    count: 0
+  });
+
+  // Reset count if it's a new day
+  const todayCount = achievementData.date === today ? achievementData.count : 0;
+
+  const incrementCount = () => {
+    setAchievementData({
+      date: today,
+      count: todayCount + 1
+    });
+  };
+
+  const resetCount = () => {
+    setAchievementData({
+      date: today,
+      count: 0
+    });
+  };
+
+  return {
+    todayCount,
+    incrementCount,
+    resetCount
+  };
+};
+
+// Custom hook for managing todo data
+const useTodoData = (filter) => {
+  const [todos, setTodos] = useLocalStorage(filter, []);
+  const [todoDetails, setTodoDetails] = useLocalStorage(`${filter}-details`, []);
+  const [todoDates, setTodoDates] = useLocalStorage(`${filter}-dates`, []);
+
+  return {
+    todos,
+    setTodos,
+    todoDetails,
+    setTodoDetails,
+    todoDates,
+    setTodoDates
+  };
+};
+
+// Custom hook for cross-filter operations (bucket/today)
+const useCrossFilterData = (filter) => {
+  const [crossFilterTodos, setCrossFilterTodos] = useLocalStorage(
+    filter === "bucket" ? "today" : "bucket", 
+    []
+  );
+  const [crossFilterTodoDetails, setCrossFilterTodoDetails] = useLocalStorage(
+    filter === "bucket" ? "today-details" : "bucket-details", 
+    []
+  );
+  const [crossFilterTodoDates, setCrossFilterTodoDates] = useLocalStorage(
+    filter === "bucket" ? "today-dates" : "bucket-dates", 
+    []
+  );
+
+  return {
+    crossFilterTodos,
+    setCrossFilterTodos,
+    crossFilterTodoDetails,
+    setCrossFilterTodoDetails,
+    crossFilterTodoDates,
+    setCrossFilterTodoDates
+  };
+};
+
+// Custom hook for problem-solving placeholder logic
+const useProblemPlaceholder = (todosLength, isProblem) => {
+  const [placeholder, setPlaceholder] = useState("Write the first step...");
+
+  const placeholderTexts = [
+    "Write the first step...",
+    "What's the next action?",
+    "Describe a solution...",
+    "Add a task to tackle this...",
+    "Break it down into a step...",
+  ];
+
+  useEffect(() => {
+    if (!isProblem) {
+      setPlaceholder(placeholderTexts[0]);
+      return;
+    }
+
+    const placeholderMap = {
+      0: "Start Thinking...",
+      3: "Common people do...",
+      5: "Think Roi ...",
+      9: "Different perspective...",
+      12: "Brainstorming...",
+      14: "Seek the excellence...",
+    };
+
+    const applicablePlaceholder = Object.keys(placeholderMap)
+      .reverse()
+      .find(threshold => todosLength >= parseInt(threshold));
+
+    if (applicablePlaceholder) {
+      setPlaceholder(placeholderMap[applicablePlaceholder]);
+    }
+  }, [todosLength, isProblem]);
+
+  return placeholder;
+};
+
+// Component for problem heading input
+const ProblemHeadingInput = ({ inputValue, setInputValue, onAdd }) => (
+  <div className="todo-input-container">
+    <input
+      type="text"
+      placeholder="Enter your main problem statement..."
+      value={inputValue}
+      onChange={(e) => setInputValue(e.target.value)}
+      onKeyDown={(e) => { if (e.key === 'Enter') onAdd(); }}
+      className="todo-input"
+    />
+    <button onClick={onAdd} className="add-button">Add</button>
+  </div>
+);
+
+// Component for todo input
+const TodoInput = ({ inputValue, setInputValue, onAdd, placeholder, name, isProblem, isHeading }) => {
+  if (isProblem && !isHeading) {
+    return <ProblemHeadingInput inputValue={inputValue} setInputValue={setInputValue} onAdd={onAdd} />;
+  }
+
+  return (
+    <>
+      {isProblem ? (
+        <h5>{`how I can solve: ${isHeading} Problem`}</h5>
+      ) : (
+        <h1>{name}</h1>
+      )}
+      <div className="todo-input-container">
+        <input
+          type="text"
+          placeholder={isProblem ? placeholder : "Add a new todo..."}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') onAdd(); }}
+          className="todo-input"
+        />
+        <button onClick={onAdd} className="add-button">Add</button>
+      </div>
+    </>
+  );
+};
+
+// Component for todo item actions
+const TodoItemActions = ({ index, isBucket, isToday, expandedIndex, onMove, onRemove }) => {
+  if (expandedIndex === index) return null;
+
+  if (isBucket || isToday) {
+    return (
+      <div className='button-icon' style={{ display: 'flex', gap: '0.5rem' }}>
+        <MdDriveFileMove onClick={() => onMove(index)} size={30} className="move-icon" />
+        <MdDelete onClick={() => onRemove(index)} size={30} className="delete-icon" />
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={() => onRemove(index)} className="remove-button">
+      Remove
+    </button>
+  );
+};
+
+// Component for expanded todo details
+const TodoDetails = ({ index, todoDetails, todoDates, onDetailChange, onDateChange }) => (
+  <div className="todo-details">
+    <textarea
+      value={todoDetails[index] || ''}
+      onChange={(e) => onDetailChange(e, index)}
+      placeholder="Edit todo details..."
+      className="todo-detail-input"
+    />
+    <input
+      type="date"
+      value={todoDates[index] || new Date().toISOString().split('T')[0]}
+      onChange={(e) => onDateChange(e, index)}
+      className="date-input"
+    />
+  </div>
+);
+
+// Component for achievement display
+// const AchievementBadge = ({ count }) => {
+//   if (count === 0) return null;
+  
+//   return (
+//     <div className="achievement-badge">
+//       completed: {count}
+//     </div>
+//   );
+// };
+
+const ReportDisplay = ({ report }) => {
+  const onCopy = () => {
+    // Create a plain text version of the report.
+    let reportText = `\n${report.heading}\n\n`;
+    reportText += `Solutions & Action Items:\n`;
+
+    report.solutions.forEach((solution, index) => {
+      reportText += `${index + 1}. ${solution.text}\n`;
+      if (solution.details) {
+        reportText += `   Details: ${solution.details}\n`;
+      }
+      reportText += `\n`;
+    });
+
+    navigator.clipboard
+      .writeText(reportText)
+      .then(() => {
+        console.log("Report copied to clipboard");
+      })
+      .catch((err) => {
+        console.error("Failed to copy report: ", err);
+      });
+  };
+
+  return (
+    <div className="todo-container report-container">
+      <div className="copy-buttons">
+        <button onClick={onCopy} title="Copy Report">
+          <MdContentCopy size={20} />
+        </button>
+      </div>
+      <div className="report-header"></div>
+      <div className="report-content">
+        <div className="report-section">
+          <p className="problem-text">{report.heading}</p>
+        </div>
+        <div className="report-section">
+          <ol className="solutions-list">
+            {report.solutions.map((solution, index) => (
+              <li key={index} className="solution-item">
+                <span className="solution-text">{solution.text}</span>
+                {solution.details && (
+                  <div className="solution-details">
+                    <strong>Details:</strong> {solution.details}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const TodoComponent = ({ filter, name }) => {
-  const initialTodos = JSON.parse(localStorage.getItem(filter)) || [];
-  const initialDetails = JSON.parse(localStorage.getItem(`${filter}-details`)) || [];
-  const initialDates = JSON.parse(localStorage.getItem(`${filter}-dates`)) || [];
-
-  const [todos, setTodos] = useState(initialTodos);
+  // State management
   const [inputValue, setInputValue] = useState('');
   const [expandedIndex, setExpandedIndex] = useState(null);
-  const [todoDetails, setTodoDetails] = useState(initialDetails);
-  const [todoDates, setTodoDates] = useState(initialDates);
-  const [isBucket, setIsBucket] = useState(false);
-  const [isToday, setIsToday] = useState(false);
+  const [isHeading, setIsHeading] = useLocalStorage('problem-heading', '');
+  const [reportGenerated, setReportGenerated] = useState(false);
+  const [report, setReport] = useState(null);
 
-  // State for bucket and today filters
-  const [todayFilterTodos, setTodayFilterTodos] = useState([]);
-  const [todayFilterTodoDetails, setTodayFilterTodoDetails] = useState([]);
-  const [todayFilterTodoDates, setTodayFilterTodoDates] = useState([]);
-  const [bucketFilterTodos, setBucketFilterTodos] = useState([]);
-  const [bucketFilterTodoDetails, setBucketFilterTodoDetails] = useState([]);
-  const [bucketFilterTodoDates, setBucketFilterTodoDates] = useState([]);
+  // Derived state
+  const isBucket = filter === "bucket";
+  const isToday = filter === "today";
+  const isProblem = filter === "problems";
 
-  useEffect(() => {
-    localStorage.setItem(filter, JSON.stringify(todos));
-    localStorage.setItem(`${filter}-details`, JSON.stringify(todoDetails));
-    localStorage.setItem(`${filter}-dates`, JSON.stringify(todoDates));
-  }, [todos, todoDetails, todoDates, filter]);
+  // Custom hooks
+  const { todos, setTodos, todoDetails, setTodoDetails, todoDates, setTodoDates } = useTodoData(filter);
+  const crossFilterData = useCrossFilterData(filter);
+  const placeholder = useProblemPlaceholder(todos.length, isProblem);
+  const { todayCount, incrementCount, resetCount } = useDailyAchievementCount(filter);
 
-  useEffect(() => {
-    if (filter === "bucket") {
-      setIsBucket(true);
-      setTodayFilterTodos(JSON.parse(localStorage.getItem("today")) || []);
-      setTodayFilterTodoDetails(JSON.parse(localStorage.getItem("today-details")) || []);
-      setTodayFilterTodoDates(JSON.parse(localStorage.getItem("today-dates")) || []);
-    }
-
-    if (filter === "today") {
-      setIsToday(true);
-      setBucketFilterTodos(JSON.parse(localStorage.getItem("bucket")) || []);
-      setBucketFilterTodoDetails(JSON.parse(localStorage.getItem("bucket-details")) || []);
-      setBucketFilterTodoDates(JSON.parse(localStorage.getItem("bucket-dates")) || []);
-    }
-  }, [filter]);
-
-  // Save updated today filter when bucket is used
-  useEffect(() => {
-    if (isBucket) {
-      localStorage.setItem("today", JSON.stringify(todayFilterTodos));
-      localStorage.setItem("today-details", JSON.stringify(todayFilterTodoDetails));
-      localStorage.setItem("today-dates", JSON.stringify(todayFilterTodoDates));
-    }
-  }, [todayFilterTodos, todayFilterTodoDetails, todayFilterTodoDates, isBucket]);
-
-  // Save updated today filter when today is used
-  useEffect(() => {
-    if (isToday) {
-      localStorage.setItem("bucket", JSON.stringify(bucketFilterTodos));
-      localStorage.setItem("bucket-details", JSON.stringify(bucketFilterTodoDetails));
-      localStorage.setItem("bucket-dates", JSON.stringify(bucketFilterTodoDates));
-    }
-  }, [bucketFilterTodos, bucketFilterTodoDetails, bucketFilterTodoDates, isToday]);
-
+  // Event handlers
   const addTodo = () => {
     if (inputValue.trim() !== '') {
       const newTodo = inputValue.trim();
-      setTodos([...todos, newTodo]);
-      setTodoDetails([...todoDetails, '']);
-      setTodoDates([...todoDates, new Date().toISOString().split('T')[0]]);
+      setTodos([newTodo , ...todos]);
+      setTodoDetails(['',...todoDetails]);
+      setTodoDates([new Date().toISOString().split('T')[0] , ...todoDates]);
+      setInputValue('');
+    }
+  };
+
+  const addHeading = () => {
+    if (inputValue.trim() !== '') {
+      setIsHeading(inputValue.trim());
       setInputValue('');
     }
   };
 
   const removeTodo = (index) => {
-    const confim = window.confirm('Confirm to Remove from List. ')
-
-    if (!confim) return;
-
+    const confirm = window.confirm('Confirm to Remove from List.');
+    if (!confirm) return;
 
     const newTodos = todos.filter((_, i) => i !== index);
     const newDetails = todoDetails.filter((_, i) => i !== index);
@@ -89,25 +335,30 @@ const TodoComponent = ({ filter, name }) => {
     setTodoDetails(newDetails);
     setTodoDates(newDates);
     setExpandedIndex(null);
+    
+    // Increment achievement count when todo is removed
+    incrementCount();
   };
 
   const moveTodo = (index) => {
+    const { setCrossFilterTodos, setCrossFilterTodoDetails, setCrossFilterTodoDates } = crossFilterData;
     
+    setCrossFilterTodos(prev => [...prev, todos[index]]);
+    setCrossFilterTodoDetails(prev => [...prev, todoDetails[index]]);
+    setCrossFilterTodoDates(prev => [...prev, todoDates[index]]);
+    
+    // Remove from current list
+    const newTodos = todos.filter((_, i) => i !== index);
+    const newDetails = todoDetails.filter((_, i) => i !== index);
+    const newDates = todoDates.filter((_, i) => i !== index);
 
-    if (filter === "bucket") {
-      setTodayFilterTodos([...todayFilterTodos, todos[index]]);
-      setTodayFilterTodoDetails([...todayFilterTodoDetails, todoDetails[index]]);
-      setTodayFilterTodoDates([...todayFilterTodoDates, todoDates[index]]);
-    }
-
-    if (filter === "today") {
-      console.warn('today');
-      
-      setBucketFilterTodos([...bucketFilterTodos, todos[index]]);
-      setBucketFilterTodoDetails([...bucketFilterTodoDetails, todoDetails[index]]);
-      setBucketFilterTodoDates([...bucketFilterTodoDates, todoDates[index]]);
-    }
-    removeTodo(index);
+    setTodos(newTodos);
+    setTodoDetails(newDetails);
+    setTodoDates(newDates);
+    setExpandedIndex(null);
+    
+    // Increment achievement count when todo is moved
+    incrementCount();
   };
 
   const toggleTodoDetails = (index) => {
@@ -126,7 +377,6 @@ const TodoComponent = ({ filter, name }) => {
     setTodoDates(newDates);
   };
 
-
   const handleOnDragEnd = (result) => {
     if (!result.destination) return;
 
@@ -138,7 +388,6 @@ const TodoComponent = ({ filter, name }) => {
     const [reorderedDetails] = details.splice(result.source.index, 1);
     const [reorderedDates] = dates.splice(result.source.index, 1);
 
-
     items.splice(result.destination.index, 0, reorderedItem);
     details.splice(result.destination.index, 0, reorderedDetails);
     dates.splice(result.destination.index, 0, reorderedDates);
@@ -148,23 +397,49 @@ const TodoComponent = ({ filter, name }) => {
     setTodoDates(dates);
   };
 
+  const clearProblem = () => {
+    if (isHeading !== '') {
+      setIsHeading('');
+      setTodos([]);
+      setTodoDetails([]);
+      setTodoDates([]);
+    }
+  };
+
+  const generateReport = () => {
+    const reportData = {
+      heading: isHeading,
+      solutions: todos.map((todo, index) => ({
+        text: todo,
+        details: todoDetails[index],
+        date: todoDates[index]
+      }))
+    };
+
+    setReport(reportData);
+    setReportGenerated(true);
+  };
+
+  const handleAdd = isProblem && !isHeading ? addHeading : addTodo;
+
   return (
     <>
-      <Scoreboard score={todos.length} />
-
+      <Scoreboard score={todayCount} />
+      
+      {/* Achievement Badge */}
+      {/* <AchievementBadge count={todayCount} /> */}
+      
       <div className="todo-container">
-        <h1>{name}</h1>
-        <div className="todo-input-container">
-          <input
-            type="text"
-            placeholder="Add a new todo..."
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') addTodo(); }}
-            className="todo-input"
-          />
-          <button onClick={addTodo} className="add-button">Add</button>
-        </div>
+        <TodoInput
+          inputValue={inputValue}
+          setInputValue={setInputValue}
+          onAdd={handleAdd}
+          placeholder={placeholder}
+          name={name}
+          isProblem={isProblem}
+          isHeading={isHeading}
+        />
+        
         <DragDropContext onDragEnd={handleOnDragEnd}>
           <Droppable droppableId="todos">
             {(provided) => (
@@ -179,36 +454,27 @@ const TodoComponent = ({ filter, name }) => {
                         className="todo-item"
                       >
                         <span className="todo-number">{index + 1}.</span>
-                        <span onClick={() => toggleTodoDetails(index)} className="todo-text">{todo}</span>
-                        {expandedIndex !== index && (
-                          isBucket || isToday ? (
-                            <>
-                              <MdDriveFileMove onClick={() => moveTodo(index)} size={20} className="move-icon" />
-                              <MdDelete onClick={() => removeTodo(index)} size={20} className="delete-icon" />
-                            </>
-
-                          )
-                            : (
-                              <button onClick={() => removeTodo(index)} className="remove-button">
-                                Remove
-                              </button>
-                            )
-                        )}
+                        <span onClick={() => toggleTodoDetails(index)} className="todo-text">
+                          {todo}
+                        </span>
+                        
+                        <TodoItemActions
+                          index={index}
+                          isBucket={isBucket}
+                          isToday={isToday}
+                          expandedIndex={expandedIndex}
+                          onMove={moveTodo}
+                          onRemove={removeTodo}
+                        />
+                        
                         {expandedIndex === index && (
-                          <div className="todo-details">
-                            <textarea
-                              value={todoDetails[index] || ''}
-                              onChange={(e) => handleDetailChange(e, index)}
-                              placeholder="Edit todo details..."
-                              className="todo-detail-input"
-                            />
-                            <input
-                              type="date"
-                              value={todoDates[index] || new Date().toISOString().split('T')[0]}
-                              onChange={(e) => handleDateChange(e, index)}
-                              className="date-input"
-                            />
-                          </div>
+                          <TodoDetails
+                            index={index}
+                            todoDetails={todoDetails}
+                            todoDates={todoDates}
+                            onDetailChange={handleDetailChange}
+                            onDateChange={handleDateChange}
+                          />
                         )}
                       </li>
                     )}
@@ -219,7 +485,20 @@ const TodoComponent = ({ filter, name }) => {
             )}
           </Droppable>
         </DragDropContext>
+
+        {isProblem && (
+          <div className='problem-buttons'>
+            <button onClick={generateReport} className="solved-button">Report</button>
+            <button onClick={clearProblem} className="solved-button">Resolved</button>
+          </div>
+        )}
       </div>
+
+      {reportGenerated &&(
+        <div className="todo-container">
+          <ReportDisplay report={report}/>
+        </div>
+      )}
     </>
   );
 };
