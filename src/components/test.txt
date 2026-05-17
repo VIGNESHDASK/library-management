@@ -1,0 +1,169 @@
+// App.jsx
+import React, { useState, useEffect } from 'react';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Link,
+  useNavigate,
+  useLocation,
+  useParams,
+} from 'react-router-dom';
+
+// Injected CSS
+const styles = `
+:root { --bg: #f5f6fa; --primary: #40739e; --muted: #777; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: #333; }
+.app-container { display: flex; height: 100vh; }
+.sidebar { width: 220px; background: #2f3640; color: white; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+.sidebar .nav-btn { background: var(--primary); color: white; border: none; padding: 10px; margin-bottom: 8px; border-radius: 8px; cursor: pointer; display: block; text-decoration: none; text-align: center; }
+.sidebar .nav-btn:hover { background: #718093; }
+.search-box input { width: 100%; padding: 8px; border-radius: 6px; border: none; }
+.search-box button { margin-top: 5px; width: 100%; padding: 6px; background: #44bd32; border: none; border-radius: 6px; color: white; cursor: pointer; }
+.main-content { flex: 1; padding: 20px; overflow-y: auto; }
+.blog-list { display: flex; flex-direction: column; gap: 16px; }
+.blog-card { background: white; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); transition: transform 0.2s ease; }
+.blog-card:hover { transform: translateY(-3px); }
+.blog-card .tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { background: #dcdde1; color: #2f3640; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; transition: background 0.2s; }
+.tag:hover { background: #44bd32; color: white; }
+.form-container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.form-container input, .form-container textarea { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 8px; }
+.form-container button { background: #273c75; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; }
+.empty { text-align: center; color: var(--muted); margin-top: 100px; }
+.blog-detail { background: white; padding: 24px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); max-width: 900px; margin: 0 auto; }
+.back-link { display: inline-block; margin-bottom: 16px; color: #273c75; font-weight: bold; text-decoration: none; }
+.no-decoration { text-decoration: none; color: inherit; }
+.delete-btn { background: #e84118; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; margin-top: 16px; }
+.delete-btn:hover { background: #c23616; }
+`;
+
+const sampleBlogs = [
+  { id: '1', title: 'Getting started with React', content: 'React is a powerful library for building UIs. This post introduces components, state, and props.', tags: ['react', 'frontend'], date: new Date().toLocaleString() },
+  { id: '2', title: 'How to use LocalStorage', content: 'LocalStorage is a simple way to persist small amounts of data on the client.', tags: ['webdev', 'localstorage'], date: new Date().toLocaleString() },
+];
+
+export default function App() {
+  const [blogs, setBlogs] = useState(() => {
+    try { const raw = localStorage.getItem('blogs'); if (!raw) return sampleBlogs; const parsed = JSON.parse(raw); return Array.isArray(parsed) && parsed.length ? parsed : sampleBlogs; } catch { return sampleBlogs; }
+  });
+
+  useEffect(() => { if (!document.getElementById('app-styles')) { const s = document.createElement('style'); s.id = 'app-styles'; s.innerHTML = styles; document.head.appendChild(s); } }, []);
+  useEffect(() => { localStorage.setItem('blogs', JSON.stringify(blogs)); }, [blogs]);
+
+  const addBlog = (newBlog) => setBlogs(prev => [...prev, newBlog]);
+  const deleteBlog = (id) => setBlogs(prev => prev.filter(b => b.id !== id));
+
+  return (
+    <Router>
+      <div className="app-container">
+        <Sidebar />
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<BlogList blogs={blogs} />} />
+            <Route path="/create" element={<BlogForm onSubmit={addBlog} />} />
+            <Route path="/blog/:id" element={<BlogDetail blogs={blogs} onDelete={deleteBlog} />} />
+          </Routes>
+        </main>
+      </div>
+    </Router>
+  );
+}
+
+function Sidebar() {
+  const [searchTag, setSearchTag] = useState('');
+  const navigate = useNavigate();
+  const handleSearch = (e) => { e.preventDefault(); const tag = searchTag.trim(); if(tag) navigate(`/?tag=${encodeURIComponent(tag)}`); else navigate('/'); };
+  return (
+    <aside className="sidebar">
+      <h2>📘 MyBlog</h2>
+      <nav>
+        <Link to="/" className="nav-btn">🏠 Home</Link>
+        <Link to="/create" className="nav-btn">✍️ Create Blog</Link>
+      </nav>
+      <form onSubmit={handleSearch} className="search-box">
+        <input type="text" placeholder="#Search hashtag" value={searchTag} onChange={(e)=>setSearchTag(e.target.value)} />
+        <button type="submit">🔍</button>
+      </form>
+    </aside>
+  );
+}
+
+function BlogForm({ onSubmit }) {
+  const [title,setTitle]=useState('');
+  const [content,setContent]=useState('');
+  const [tags,setTags]=useState('');
+  const navigate = useNavigate();
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const tagArray = tags.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean);
+    if(!title.trim() || !content.trim()){ alert('Please fill title and content'); return; }
+    if(tagArray.length<2){ alert('Enter at least 2 hashtags'); return; }
+    const newBlog={id:Date.now().toString(),title:title.trim(),content:content.trim(),tags:tagArray,date:new Date().toLocaleString()};
+    onSubmit(newBlog);
+    setTitle(''); setContent(''); setTags('');
+    navigate('/');
+  };
+
+  return (
+    <div className="form-container">
+      <h2>Write a New Blog</h2>
+      <form onSubmit={handleSubmit}>
+        <input placeholder="Blog Title" value={title} onChange={(e)=>setTitle(e.target.value)} />
+        <textarea placeholder="Write your blog content..." rows={8} value={content} onChange={(e)=>setContent(e.target.value)} />
+        <input placeholder="Comma separated hashtags" value={tags} onChange={(e)=>setTags(e.target.value)} />
+        <button type="submit">Publish</button>
+      </form>
+    </div>
+  );
+}
+
+function BlogList({ blogs }) {
+  const location=useLocation();
+  const params=new URLSearchParams(location.search);
+  const filterTag=params.get('tag');
+  const filtered=filterTag ? blogs.filter(b=>(b.tags||[]).includes(filterTag.toLowerCase())) : blogs;
+  if(!filtered.length) return <p className="empty">No blogs found. Try another tag!</p>;
+  return (
+    <div className="blog-list">
+      {filtered.map(blog=>(<Link key={blog.id} to={`/blog/${blog.id}`} className="no-decoration"><BlogCard blog={blog} /></Link>))}
+    </div>
+  );
+}
+
+
+function BlogCard({ blog }) {
+  return (
+    <div className="blog-card">
+      <h3>{blog.title}</h3>
+      <p className="date">{blog.date}</p>
+      <p>{(blog.content||'').slice(0,200)}{(blog.content||'').length>200?'...':''}</p>
+      <div className="tags">{(blog.tags||[]).map((t,i)=><span key={i} className="tag">#{t}</span>)}</div>
+    </div>
+  );
+}
+
+function BlogDetail({ blogs, onDelete }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const blog = (blogs||[]).find(b=>b.id===id);
+  if(!blog) return <p className="empty">Blog not found.</p>;
+
+  const handleTagClick=(tag)=>{ navigate(`/?tag=${encodeURIComponent(tag)}`); };
+  const handleDelete=()=>{ if(window.confirm('Delete this blog?')){ onDelete(blog.id); navigate('/'); } };
+  const related=(blogs||[]).filter(b=>b.id!==blog.id&&(b.tags||[]).some(t=>(blog.tags||[]).includes(t)));
+
+  return (
+    <div className="blog-detail">
+      <Link to="/" className="back-link">⬅ Back</Link>
+      <h2>{blog.title}</h2>
+      <p className="date">{blog.date}</p>
+      <p style={{whiteSpace:'pre-wrap'}}>{blog.content}</p>
+      <div className="tags" style={{marginTop:12}}>{(blog.tags||[]).map((t,i)=><span key={i} className="tag" onClick={()=>handleTagClick(t)}>#{t}</span>)}</div>
+      <button className="delete-btn" onClick={handleDelete}>🗑️ Delete</button>
+      {related && related.length>0 && (<div style={{marginTop:24}}><h4>Related posts</h4><div className="blog-list">{related.slice(0,3).map(r=><Link key={r.id} to={`/blog/${r.id}`} className="no-decoration"><BlogCard blog={r} /></Link>)}</div></div>)}
+    </div>
+  );
+}

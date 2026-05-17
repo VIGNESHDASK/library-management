@@ -1,0 +1,3251 @@
+
+//# src/utils/encryptionUtils.js
+
+import CryptoJS from "crypto-js";
+
+/**
+ * Encrypts a password using AES-256 encryption with PBKDF2 key derivation
+ * @param {string} password - The password to encrypt
+ * @param {string} masterPassword - The master password used for encryption
+ * @returns {Object} Object containing encrypted password and salt
+ */
+export const encryptPassword = (password, masterPassword) => {
+  // Generate a random salt for this encryption
+  const salt = CryptoJS.lib.WordArray.random(128 / 8).toString();
+
+  // Derive a key from the master password using PBKDF2
+  const key = CryptoJS.PBKDF2(masterPassword, salt, {
+    keySize: 256 / 32,
+    iterations: 100000,
+  });
+
+  // Encrypt the password using AES
+  const encrypted = CryptoJS.AES.encrypt(password, key.toString()).toString();
+
+  return {
+    encrypted,
+    salt,
+  };
+};
+
+/**
+ * Decrypts a password using AES-256 decryption with PBKDF2 key derivation
+ * @param {string} encryptedPassword - The encrypted password
+ * @param {string} salt - The salt used during encryption
+ * @param {string} masterPassword - The master password used for decryption
+ * @returns {string} The decrypted password
+ * @throws {Error} If decryption fails (wrong master password)
+ */
+export const decryptPassword = (encryptedPassword, salt, masterPassword) => {
+  try {
+    // Derive the same key using the stored salt
+    const key = CryptoJS.PBKDF2(masterPassword, salt, {
+      keySize: 256 / 32,
+      iterations: 100000,
+    });
+
+    // Decrypt the password
+    const decrypted = CryptoJS.AES.decrypt(encryptedPassword, key.toString());
+    const decryptedPassword = decrypted.toString(CryptoJS.enc.Utf8);
+
+    if (!decryptedPassword) {
+      throw new Error("Decryption failed");
+    }
+
+    return decryptedPassword;
+  } catch (error) {
+    throw new Error("Failed to decrypt password. Wrong master password?");
+  }
+};
+
+/**
+ * Generates a secure random password
+ * @param {number} length - Length of the password (default: 16)
+ * @param {Object} options - Options for password generation
+ * @returns {string} Generated password
+ */
+export const generateSecurePassword = (length = 16, options = {}) => {
+  const {
+    includeUppercase = true,
+    includeLowercase = true,
+    includeNumbers = true,
+    includeSymbols = true,
+  } = options;
+
+  let charset = "";
+  if (includeUppercase) charset += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  if (includeLowercase) charset += "abcdefghijklmnopqrstuvwxyz";
+  if (includeNumbers) charset += "0123456789";
+  if (includeSymbols) charset += "!@#$%^&*()_+-=[]{}|;:,.<>?";
+
+  const randomValues = new Uint32Array(length);
+  window.crypto.getRandomValues(randomValues);
+
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += charset[randomValues[i] % charset.length];
+  }
+
+  return password;
+};
+
+/**
+ * Validates master password strength
+ * @param {string} password - The password to validate
+ * @returns {Object} Validation result with isValid and message
+ */
+export const validateMasterPassword = (password) => {
+  if (password.length < 8) {
+    return {
+      isValid: false,
+      message: "Master password must be at least 8 characters long",
+    };
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return {
+      isValid: false,
+      message: "Master password must contain at least one uppercase letter",
+    };
+  }
+
+  if (!/[a-z]/.test(password)) {
+    return {
+      isValid: false,
+      message: "Master password must contain at least one lowercase letter",
+    };
+  }
+
+  if (!/[0-9]/.test(password)) {
+    return {
+      isValid: false,
+      message: "Master password must contain at least one number",
+    };
+  }
+
+  return { isValid: true, message: "Password is strong" };
+};
+
+
+
+
+
+//# src/components/TodoComponent.js
+
+
+import { useEffect, useState } from "react";
+import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
+import { MdContentCopy, MdDelete, MdDriveFileMove } from "react-icons/md";
+import "../App.css";
+import Scoreboard from "./Scoreboard";
+
+// Custom hook for localStorage management
+const useLocalStorage = (key, initialValue) => {
+  const [value, setValue] = useState(() => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.error(`Error reading localStorage key "${key}":`, error);
+      return initialValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error setting localStorage key "${key}":`, error);
+    }
+  }, [key, value]);
+
+  return [value, setValue];
+};
+
+// Custom hook for managing daily achievement count
+const useDailyAchievementCount = (filter) => {
+  const today = new Date().toLocaleDateString('en-CA'); // local date YYYY-MM-DD
+  const [achievementData, setAchievementData] = useLocalStorage(
+    `${filter}-achievements`,
+    {
+      date: today,
+      count: 0,
+    },
+  );
+
+  // Reset count if it's a new day
+  const todayCount = achievementData.date === today ? achievementData.count : 0;
+
+  const incrementCount = () => {
+    setAchievementData({
+      date: today,
+      count: todayCount + 1,
+    });
+  };
+
+  const resetCount = () => {
+    setAchievementData({
+      date: today,
+      count: 0,
+    });
+  };
+
+  return {
+    todayCount,
+    incrementCount,
+    resetCount,
+  };
+};
+
+// Custom hook for managing todo data
+const useTodoData = (filter) => {
+  const [todos, setTodos] = useLocalStorage(filter, []);
+  const [todoDetails, setTodoDetails] = useLocalStorage(
+    `${filter}-details`,
+    [],
+  );
+  const [todoDates, setTodoDates] = useLocalStorage(`${filter}-dates`, []);
+
+  return {
+    todos,
+    setTodos,
+    todoDetails,
+    setTodoDetails,
+    todoDates,
+    setTodoDates,
+  };
+};
+
+// Custom hook for cross-filter operations (bucket/today)
+const useCrossFilterData = (filter) => {
+  const [crossFilterTodos, setCrossFilterTodos] = useLocalStorage(
+    filter === "bucket" ? "today" : "bucket",
+    [],
+  );
+  const [crossFilterTodoDetails, setCrossFilterTodoDetails] = useLocalStorage(
+    filter === "bucket" ? "today-details" : "bucket-details",
+    [],
+  );
+  const [crossFilterTodoDates, setCrossFilterTodoDates] = useLocalStorage(
+    filter === "bucket" ? "today-dates" : "bucket-dates",
+    [],
+  );
+
+  return {
+    crossFilterTodos,
+    setCrossFilterTodos,
+    crossFilterTodoDetails,
+    setCrossFilterTodoDetails,
+    crossFilterTodoDates,
+    setCrossFilterTodoDates,
+  };
+};
+
+// Custom hook for problem-solving placeholder logic
+const useProblemPlaceholder = (todosLength, isProblem) => {
+  const [placeholder, setPlaceholder] = useState("Write the first step...");
+
+  const placeholderTexts = [
+    "Write the first step...",
+    "What's the next action?",
+    "Describe a solution...",
+    "Add a task to tackle this...",
+    "Break it down into a step...",
+  ];
+
+  useEffect(() => {
+    if (!isProblem) {
+      setPlaceholder(placeholderTexts[0]);
+      return;
+    }
+
+    const placeholderMap = {
+      0: "Start Thinking...",
+      3: "Common people do...",
+      5: "Think Roi ...",
+      9: "Different perspective...",
+      12: "Brainstorming...",
+      14: "Seek the excellence...",
+    };
+
+    const applicablePlaceholder = Object.keys(placeholderMap)
+      .reverse()
+      .find((threshold) => todosLength >= parseInt(threshold));
+
+    if (applicablePlaceholder) {
+      setPlaceholder(placeholderMap[applicablePlaceholder]);
+    }
+  }, [todosLength, isProblem]);
+
+  return placeholder;
+};
+
+// Component for problem heading input
+const ProblemHeadingInput = ({ inputValue, setInputValue, onAdd }) => (
+  <div className="todo-input-container">
+    <input
+      type="text"
+      placeholder="Enter your main problem statement..."
+      value={inputValue}
+      onChange={(e) => setInputValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onAdd();
+      }}
+      className="todo-input"
+    />
+    <button onClick={onAdd} className="add-button">
+      Add
+    </button>
+  </div>
+);
+
+// Component for todo input
+const TodoInput = ({
+  inputValue,
+  setInputValue,
+  onAdd,
+  placeholder,
+  name,
+  isProblem,
+  isHeading,
+}) => {
+  if (isProblem && !isHeading) {
+    return (
+      <ProblemHeadingInput
+        inputValue={inputValue}
+        setInputValue={setInputValue}
+        onAdd={onAdd}
+      />
+    );
+  }
+
+  return (
+    <>
+      {isProblem ? (
+        <h5>{`how I can solve: ${isHeading} Problem`}</h5>
+      ) : (
+        <h1>{name}</h1>
+      )}
+      <div className="todo-input-container">
+        <input
+          type="text"
+          placeholder={isProblem ? placeholder : "Add a new todo..."}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onAdd();
+          }}
+          className="todo-input"
+        />
+        <button onClick={onAdd} className="add-button">
+          Add
+        </button>
+      </div>
+    </>
+  );
+};
+
+// Component for todo item actions
+const TodoItemActions = ({
+  index,
+  isBucket,
+  isToday,
+  expandedIndex,
+  onMove,
+  onRemove,
+}) => {
+  if (expandedIndex === index) return null;
+
+  if (isBucket || isToday) {
+    return (
+      <div className="button-icon" style={{ display: "flex", gap: "0.5rem" }}>
+        <MdDriveFileMove
+          onClick={() => onMove(index)}
+          size={30}
+          className="move-icon"
+        />
+        <MdDelete
+          onClick={() => onRemove(index)}
+          size={30}
+          className="delete-icon"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={() => onRemove(index)} className="remove-button">
+      Remove
+    </button>
+  );
+};
+
+// Component for expanded todo details
+const TodoDetails = ({
+  index,
+  todoDetails,
+  todoDates,
+  onDetailChange,
+  onDateChange,
+}) => (
+  <div className="todo-details">
+    <textarea
+      value={todoDetails[index] || ""}
+      onChange={(e) => onDetailChange(e, index)}
+      placeholder="Edit todo details..."
+      className="todo-detail-input"
+    />
+    <input
+      type="date"
+      value={todoDates[index] || new Date().toISOString().split("T")[0]}
+      onChange={(e) => onDateChange(e, index)}
+      className="date-input"
+    />
+  </div>
+);
+
+// Component for achievement display
+// const AchievementBadge = ({ count }) => {
+//   if (count === 0) return null;
+
+//   return (
+//     <div className="achievement-badge">
+//       completed: {count}
+//     </div>
+//   );
+// };
+
+const ReportDisplay = ({ report }) => {
+  const onCopy = () => {
+    // Create a plain text version of the report.
+    let reportText = `\n${report.heading}\n\n`;
+    reportText += `Solutions & Action Items:\n`;
+
+    report.solutions.forEach((solution, index) => {
+      reportText += `${index + 1}. ${solution.text}\n`;
+      if (solution.details) {
+        reportText += `   Details: ${solution.details}\n`;
+      }
+      reportText += `\n`;
+    });
+
+    navigator.clipboard
+      .writeText(reportText)
+      .then(() => {
+        console.log("Report copied to clipboard");
+      })
+      .catch((err) => {
+        console.error("Failed to copy report: ", err);
+      });
+  };
+
+  return (
+    <div className="todo-container report-container">
+      <div className="copy-buttons">
+        <button onClick={onCopy} title="Copy Report">
+          <MdContentCopy size={20} />
+        </button>
+      </div>
+      <div className="report-header"></div>
+      <div className="report-content">
+        <div className="report-section">
+          <p className="problem-text">{report.heading}</p>
+        </div>
+        <div className="report-section">
+          <ol className="solutions-list">
+            {report.solutions.map((solution, index) => (
+              <li key={index} className="solution-item">
+                <span className="solution-text">{solution.text}</span>
+                {solution.details && (
+                  <div className="solution-details">
+                    <strong>Details:</strong> {solution.details}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TodoComponent = ({ filter, name }) => {
+  // State management
+  const [inputValue, setInputValue] = useState("");
+  const [expandedIndex, setExpandedIndex] = useState(null);
+  const [isHeading, setIsHeading] = useLocalStorage("problem-heading", "");
+  const [reportGenerated, setReportGenerated] = useState(false);
+  const [report, setReport] = useState(null);
+
+  // Derived state
+  const isBucket = filter === "bucket";
+  const isToday = filter === "today";
+  const isProblem = filter === "problems";
+
+  // Custom hooks
+  const {
+    todos,
+    setTodos,
+    todoDetails,
+    setTodoDetails,
+    todoDates,
+    setTodoDates,
+  } = useTodoData(filter);
+  const crossFilterData = useCrossFilterData(filter);
+  const placeholder = useProblemPlaceholder(todos.length, isProblem);
+  const { todayCount, incrementCount, resetCount } =
+    useDailyAchievementCount(filter);
+
+  // Event handlers
+  const addTodo = () => {
+    if (inputValue.trim() !== "") {
+      const newTodo = inputValue.trim();
+      setTodos([newTodo, ...todos]);
+      setTodoDetails(["", ...todoDetails]);
+      setTodoDates([new Date().toISOString().split("T")[0], ...todoDates]);
+      setInputValue("");
+      // Prepending shifts all existing indices by 1; keep expandedIndex on the same item
+      if (expandedIndex !== null) {
+        setExpandedIndex(expandedIndex + 1);
+      }
+    }
+  };
+
+  const addHeading = () => {
+    if (inputValue.trim() !== "") {
+      setIsHeading(inputValue.trim());
+      setInputValue("");
+    }
+  };
+
+  const removeTodo = (index) => {
+    const confirm = window.confirm("Confirm to Remove from List.");
+    if (!confirm) return;
+
+    const newTodos = todos.filter((_, i) => i !== index);
+    const newDetails = todoDetails.filter((_, i) => i !== index);
+    const newDates = todoDates.filter((_, i) => i !== index);
+
+    setTodos(newTodos);
+    setTodoDetails(newDetails);
+    setTodoDates(newDates);
+    setExpandedIndex(null);
+
+    // Increment achievement count when todo is removed
+    incrementCount();
+  };
+
+  const moveTodo = (index) => {
+    const {
+      setCrossFilterTodos,
+      setCrossFilterTodoDetails,
+      setCrossFilterTodoDates,
+    } = crossFilterData;
+
+    // Read directly from localStorage to avoid stale state from deferred useEffect writes
+    const destKey = filter === "bucket" ? "today" : "bucket";
+    const destDetailsKey =
+      filter === "bucket" ? "today-details" : "bucket-details";
+    const destDatesKey = filter === "bucket" ? "today-dates" : "bucket-dates";
+
+    const destTodos = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(destKey)) || [];
+      } catch {
+        return [];
+      }
+    })();
+    const destDetails = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(destDetailsKey)) || [];
+      } catch {
+        return [];
+      }
+    })();
+    const destDates = (() => {
+      try {
+        return JSON.parse(localStorage.getItem(destDatesKey)) || [];
+      } catch {
+        return [];
+      }
+    })();
+
+    const updatedTodos = [...destTodos, todos[index]];
+    const updatedDetails = [...destDetails, todoDetails[index]];
+    const updatedDates = [...destDates, todoDates[index]];
+
+    // Write all three atomically so destination always reads consistent data
+    localStorage.setItem(destKey, JSON.stringify(updatedTodos));
+    localStorage.setItem(destDetailsKey, JSON.stringify(updatedDetails));
+    localStorage.setItem(destDatesKey, JSON.stringify(updatedDates));
+
+    setCrossFilterTodos(updatedTodos);
+    setCrossFilterTodoDetails(updatedDetails);
+    setCrossFilterTodoDates(updatedDates);
+
+    // Remove from current list
+    const newTodos = todos.filter((_, i) => i !== index);
+    const newDetails = todoDetails.filter((_, i) => i !== index);
+    const newDates = todoDates.filter((_, i) => i !== index);
+
+    setTodos(newTodos);
+    setTodoDetails(newDetails);
+    setTodoDates(newDates);
+    setExpandedIndex(null);
+
+    // Increment achievement count when todo is moved
+    incrementCount();
+  };
+
+  const toggleTodoDetails = (index) => {
+    setExpandedIndex(expandedIndex === index ? null : index);
+  };
+
+  const handleDetailChange = (e, index) => {
+    const newDetails = [...todoDetails];
+    newDetails[index] = e.target.value;
+    setTodoDetails(newDetails);
+  };
+
+  const handleDateChange = (e, index) => {
+    const newDates = [...todoDates];
+    newDates[index] = e.target.value;
+    setTodoDates(newDates);
+  };
+
+  const handleOnDragEnd = (result) => {
+    if (!result.destination) return;
+
+    const items = Array.from(todos);
+    const details = Array.from(todoDetails);
+    const dates = Array.from(todoDates);
+
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    const [reorderedDetails] = details.splice(result.source.index, 1);
+    const [reorderedDates] = dates.splice(result.source.index, 1);
+
+    items.splice(result.destination.index, 0, reorderedItem);
+    details.splice(result.destination.index, 0, reorderedDetails);
+    dates.splice(result.destination.index, 0, reorderedDates);
+
+    setTodos(items);
+    setTodoDetails(details);
+    setTodoDates(dates);
+  };
+
+  const clearProblem = () => {
+    if (isHeading !== "") {
+      setIsHeading("");
+      setTodos([]);
+      setTodoDetails([]);
+      setTodoDates([]);
+    }
+  };
+
+  const generateReport = () => {
+    const reportData = {
+      heading: isHeading,
+      solutions: todos.map((todo, index) => ({
+        text: todo,
+        details: todoDetails[index],
+        date: todoDates[index],
+      })),
+    };
+
+    setReport(reportData);
+    setReportGenerated(true);
+  };
+
+  const handleAdd = isProblem && !isHeading ? addHeading : addTodo;
+
+  return (
+    <>
+      <Scoreboard
+        score={todayCount}
+        bucketCompleted={filter === "bucket" ? todayCount : undefined}
+        bucketRemaining={filter === "bucket" ? todos.length : undefined}
+        todayCompleted={filter === "today" ? todayCount : undefined}
+        todayRemaining={filter === "today" ? todos.length : undefined}
+      />
+
+      {/* Achievement Badge */}
+      {/* <AchievementBadge count={todayCount} /> */}
+
+      <div className="todo-container">
+        <TodoInput
+          inputValue={inputValue}
+          setInputValue={setInputValue}
+          onAdd={handleAdd}
+          placeholder={placeholder}
+          name={name}
+          isProblem={isProblem}
+          isHeading={isHeading}
+        />
+
+        <DragDropContext onDragEnd={handleOnDragEnd}>
+          <Droppable droppableId="todos">
+            {(provided) => (
+              <ul
+                {...provided.droppableProps}
+                ref={provided.innerRef}
+                className="todo-list"
+              >
+                {todos.map((todo, index) => (
+                  <Draggable
+                    key={index}
+                    draggableId={index.toString()}
+                    index={index}
+                  >
+                    {(provided) => (
+                      <li
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                        ref={provided.innerRef}
+                        className="todo-item"
+                      >
+                        <span className="todo-number">{index + 1}.</span>
+                        <span
+                          onClick={() => toggleTodoDetails(index)}
+                          className="todo-text"
+                        >
+                          {todo}
+                        </span>
+
+                        <TodoItemActions
+                          index={index}
+                          isBucket={isBucket}
+                          isToday={isToday}
+                          expandedIndex={expandedIndex}
+                          onMove={moveTodo}
+                          onRemove={removeTodo}
+                        />
+
+                        {expandedIndex === index && (
+                          <TodoDetails
+                            index={index}
+                            todoDetails={todoDetails}
+                            todoDates={todoDates}
+                            onDetailChange={handleDetailChange}
+                            onDateChange={handleDateChange}
+                          />
+                        )}
+                      </li>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </ul>
+            )}
+          </Droppable>
+        </DragDropContext>
+
+        {isProblem && (
+          <div className="problem-buttons">
+            <button onClick={generateReport} className="solved-button">
+              Report
+            </button>
+            <button onClick={clearProblem} className="solved-button">
+              Resolved
+            </button>
+          </div>
+        )}
+      </div>
+
+      {reportGenerated && (
+        <div className="todo-container">
+          <ReportDisplay report={report} />
+        </div>
+      )}
+    </>
+  );
+};
+
+export default TodoComponent;
+
+//# src/components/Scoreboard.js
+
+
+import '../App.css';
+
+const Scoreboard = ({
+  score,
+  bucketCompleted,
+  bucketRemaining,
+  todayCompleted,
+  todayRemaining,
+}) => {
+  const objectMapper = [
+    { score: 1, message: "good to go" },
+    { score: 3, message: "try now" },
+    { score: 5, message: "try to finish within 1 hour" },
+    { score: 10, message: "keep in mind Pansons law" },
+  ];
+
+  // Find the closest lower or equal message for the given score
+  const result = [...objectMapper].reverse().find((item) => score >= item.score)?.message || "Try new manh";
+
+  return (
+    <div className='score'>
+     {
+    bucketCompleted !== undefined
+      ? `Finished ${bucketCompleted} of ${bucketRemaining}`
+      : todayCompleted !== undefined
+      ? `Finished ${todayCompleted} of ${todayRemaining}`
+      : score
+      } || Result :  {result}
+    </div>
+  );
+};
+
+export default Scoreboard;
+
+
+
+//# src/components/SyncComponent.js
+
+import { useEffect, useState } from "react";
+import "../App.css";
+import { auth } from "../firebase/config";
+import { loginUser, logoutUser, onAuthChange } from "../services/authService";
+import {
+  exportDataToFirestore,
+  importDataFromFirestore,
+} from "../services/firestoreService";
+import Toast from "./Toast";
+
+const SyncComponent = () => {
+  const [toast, setToast] = useState(null);
+  const [loading, setLoading] = useState({ export: false, import: false });
+  const [user, setUser] = useState(null);
+  const [showLogin, setShowLogin] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [authListenerActive, setAuthListenerActive] = useState(false);
+
+  // Only listen to auth changes after user interacts with cloud sync
+  useEffect(() => {
+    if (!authListenerActive) return;
+
+    const unsubscribe = onAuthChange((authUser) => {
+      setUser(authUser);
+      if (authUser) {
+        setShowLogin(false);
+        setEmail("");
+        setPassword("");
+      }
+    });
+    return () => unsubscribe();
+  }, [authListenerActive]);
+
+  const showToast = (message, type = "info") => {
+    setToast({ message, type });
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!email || !password) {
+      showToast("Please enter email and password", "error");
+      return;
+    }
+
+    setLoggingIn(true);
+    const result = await loginUser(email, password);
+    setLoggingIn(false);
+
+    if (result.success) {
+      showToast("✓ Logged in successfully!", "success");
+      setUser(result.user);
+      setShowLogin(false);
+      setEmail("");
+      setPassword("");
+      setAuthListenerActive(true);
+    } else {
+      showToast("Login failed: " + result.error, "error");
+    }
+  };
+
+  const handleLogout = async () => {
+    const result = await logoutUser();
+    if (result.success) {
+      showToast("✓ Logged out successfully!", "success");
+      setUser(null);
+    } else {
+      showToast("Logout failed: " + result.error, "error");
+    }
+  };
+
+  const handleExport = async () => {
+    console.log("Export button clicked");
+
+    // Check current auth state
+    const currentUser = auth.currentUser;
+
+    // Activate auth listener if not already active
+    if (!authListenerActive) {
+      setAuthListenerActive(true);
+      setUser(currentUser);
+    }
+
+    if (!currentUser) {
+      showToast("Please login to use cloud sync", "error");
+      setShowLogin(true);
+      return;
+    }
+
+    setLoading((prev) => ({ ...prev, export: true }));
+
+    try {
+      const result = await exportDataToFirestore(currentUser.uid);
+      console.log("Export result:", result);
+
+      setLoading((prev) => ({ ...prev, export: false }));
+
+      if (result.success) {
+        showToast(
+          `✓ Exported ${result.recordCount} records to cloud successfully!`,
+          "success",
+        );
+      } else {
+        showToast(result.message || "Export failed", "error");
+      }
+    } catch (error) {
+      console.error("Export handler error:", error);
+      setLoading((prev) => ({ ...prev, export: false }));
+      showToast("Export failed: " + error.message, "error");
+    }
+  };
+
+  const handleImport = async () => {
+    console.log("Import button clicked");
+
+    // Check current auth state
+    const currentUser = auth.currentUser;
+
+    // Activate auth listener if not already active
+    if (!authListenerActive) {
+      setAuthListenerActive(true);
+      setUser(currentUser);
+    }
+
+    if (!currentUser) {
+      showToast("Please login to use cloud sync", "error");
+      setShowLogin(true);
+      return;
+    }
+
+    const confirmImport = window.confirm(
+      "This will merge cloud data with your local data. Continue?",
+    );
+
+    if (!confirmImport) return;
+
+    setLoading((prev) => ({ ...prev, import: true }));
+
+    try {
+      const result = await importDataFromFirestore(currentUser.uid);
+      console.log("Import result:", result);
+
+      setLoading((prev) => ({ ...prev, import: false }));
+
+      if (result.success) {
+        let message = `✓ Imported ${result.recordCount} records from cloud`;
+        if (result.newCount > 0) message += ` (${result.newCount} new)`;
+        if (result.updatedCount > 0)
+          message += ` (${result.updatedCount} merged)`;
+        message += `. Page will reload in 3 seconds...`;
+
+        showToast(message, "success");
+
+        // Reload the page to reflect imported data after showing message
+        setTimeout(() => {
+          window.location.reload();
+        }, 3500);
+      } else {
+        showToast(result.message || "Import failed", "error");
+      }
+    } catch (error) {
+      console.error("Import handler error:", error);
+      setLoading((prev) => ({ ...prev, import: false }));
+      showToast("Import failed: " + error.message, "error");
+    }
+  };
+
+  const handleJSONExport = () => {
+    try {
+      // Get all data from localStorage
+      const allData = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        allData[key] = localStorage.getItem(key);
+      }
+
+      // Create JSON blob
+      const jsonString = JSON.stringify(allData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+
+      // Create download link
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `library-data-backup-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showToast("✓ Data exported to JSON file successfully!", "success");
+    } catch (error) {
+      showToast("Failed to export JSON: " + error.message, "error");
+    }
+  };
+
+  const handleJSONImport = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json";
+
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const importedData = JSON.parse(event.target.result);
+
+          const confirmImport = window.confirm(
+            `This will merge ${Object.keys(importedData).length} items with your local data. Continue?`,
+          );
+
+          if (!confirmImport) return;
+
+          // Import data to localStorage
+          let importedCount = 0;
+          for (const [key, value] of Object.entries(importedData)) {
+            localStorage.setItem(key, value);
+            importedCount++;
+          }
+
+          showToast(
+            `✓ Imported ${importedCount} items from JSON. Page will reload in 3 seconds...`,
+            "success",
+          );
+
+          // Reload the page to reflect imported data
+          setTimeout(() => {
+            window.location.reload();
+          }, 3000);
+        } catch (error) {
+          showToast("Failed to import JSON: " + error.message, "error");
+        }
+      };
+
+      reader.onerror = () => {
+        showToast("Failed to read file", "error");
+      };
+
+      reader.readAsText(file);
+    };
+
+    input.click();
+  };
+
+  const handleClearDB = () => {
+    const confirmClear = window.confirm(
+      "⚠️ WARNING: This will permanently delete ALL local data. This cannot be undone. Are you sure?",
+    );
+
+    if (!confirmClear) return;
+
+    const doubleConfirm = window.confirm(
+      "Final confirmation: Delete all local data permanently?",
+    );
+
+    if (!doubleConfirm) return;
+
+    try {
+      // Get the dark mode setting before clearing
+      const darkModeSetting = localStorage.getItem("darkMode");
+
+      // Clear all localStorage
+      localStorage.clear();
+
+      // Restore dark mode setting
+      if (darkModeSetting) {
+        localStorage.setItem("darkMode", darkModeSetting);
+      }
+
+      showToast("✓ All local data has been cleared successfully!", "success");
+
+      // Reload after 2 seconds
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } catch (error) {
+      showToast("Failed to clear data: " + error.message, "error");
+    }
+  };
+
+  const syncTiles = [
+    {
+      label: loading.import ? "Importing..." : "Import",
+      onClick: handleImport,
+      disabled: loading.export || loading.import,
+    },
+    {
+      label: loading.export ? "Exporting..." : "Export",
+      onClick: handleExport,
+      disabled: loading.export || loading.import,
+    },
+    {
+      label: "JSON Export",
+      onClick: handleJSONExport,
+      disabled: loading.export || loading.import,
+    },
+    {
+      label: "JSON Import",
+      onClick: handleJSONImport,
+      disabled: loading.export || loading.import,
+    },
+    {
+      label: "Clear DB",
+      onClick: handleClearDB,
+      disabled: loading.export || loading.import,
+    },
+  ];
+
+  return (
+    <>
+      {/* Authentication Status */}
+      {user && (
+        <div
+          style={{
+            padding: "15px",
+            marginBottom: "20px",
+            backgroundColor: "var(--tile-bg, #f5f5f5)",
+            borderRadius: "8px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span>
+            Logged in as: <strong>{user.email}</strong>
+          </span>
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#dc3545",
+              color: "white",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+            }}
+          >
+            Logout
+          </button>
+        </div>
+      )}
+
+      {/* Login Form */}
+      {showLogin && !user && (
+        <div
+          style={{
+            padding: "20px",
+            marginBottom: "20px",
+            backgroundColor: "var(--tile-bg, #f5f5f5)",
+            borderRadius: "8px",
+          }}
+        >
+          <h3 style={{ marginTop: 0 }}>Login for Cloud Sync</h3>
+          <form onSubmit={handleLogin}>
+            <div style={{ marginBottom: "15px" }}>
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: "5px",
+                  border: "1px solid #ccc",
+                  fontSize: "14px",
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: "15px" }}>
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: "5px",
+                  border: "1px solid #ccc",
+                  fontSize: "14px",
+                }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                type="submit"
+                disabled={loggingIn}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor: "#007bff",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "5px",
+                  cursor: loggingIn ? "not-allowed" : "pointer",
+                  opacity: loggingIn ? 0.6 : 1,
+                }}
+              >
+                {loggingIn ? "Logging in..." : "Login"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowLogin(false)}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor: "#6c757d",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="tiles-container">
+        {syncTiles.map((tile, index) => (
+          <div
+            key={index}
+            className={`tile ${tile.disabled ? "tile-disabled" : ""}`}
+            onClick={tile.disabled ? undefined : tile.onClick}
+            style={
+              tile.disabled
+                ? { cursor: "not-allowed", opacity: 0.6 }
+                : { cursor: "pointer" }
+            }
+          >
+            <span className="tile-icon">{tile.icon}</span>
+            <span className="tile-label">{tile.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={toast.type === "success" ? 5000 : 4000}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </>
+  );
+};
+
+export default SyncComponent;
+
+
+//# src/components/Scoreboard.js
+
+
+import '../App.css';
+
+const Scoreboard = ({
+  score,
+  bucketCompleted,
+  bucketRemaining,
+  todayCompleted,
+  todayRemaining,
+}) => {
+  const objectMapper = [
+    { score: 1, message: "good to go" },
+    { score: 3, message: "try now" },
+    { score: 5, message: "try to finish within 1 hour" },
+    { score: 10, message: "keep in mind Pansons law" },
+  ];
+
+  // Find the closest lower or equal message for the given score
+  const result = [...objectMapper].reverse().find((item) => score >= item.score)?.message || "Try new manh";
+
+  return (
+    <div className='score'>
+     {
+    bucketCompleted !== undefined
+      ? `Finished ${bucketCompleted} of ${bucketRemaining}`
+      : `${todayCompleted}/${todayRemaining}`
+      } || Result :  {result}
+    </div>
+  );
+};
+
+export default Scoreboard;
+
+
+//# src/components/PasswordManagerComponent.js
+
+
+import { useEffect, useState } from "react";
+import {
+  MdContentCopy,
+  MdDelete,
+  MdLock,
+  MdVisibility,
+  MdVisibilityOff,
+} from "react-icons/md";
+import "../App.css";
+import { decryptPassword, encryptPassword } from "../utils/encryptionUtils";
+
+const PasswordManagerComponent = () => {
+  const [masterPassword, setMasterPassword] = useState("");
+  const [passwords, setPasswords] = useState([]);
+  const [showPassword, setShowPassword] = useState({});
+  const [decryptedPasswords, setDecryptedPasswords] = useState({});
+  const [expandedId, setExpandedId] = useState(null);
+  const [website, setWebsite] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  // Load passwords from localStorage on mount
+  useEffect(() => {
+    const savedPasswords = localStorage.getItem("passwordManager_vault");
+    if (savedPasswords) {
+      try {
+        setPasswords(JSON.parse(savedPasswords));
+      } catch (error) {
+        console.error("Error loading passwords:", error);
+      }
+    }
+  }, []);
+
+  // Prompt for master password if not set
+  const promptMasterPassword = () => {
+    if (!masterPassword) {
+      const mp = prompt("Enter your master password:");
+      if (mp) {
+        setMasterPassword(mp);
+        return mp;
+      }
+      return null;
+    }
+    return masterPassword;
+  };
+
+  // Save passwords to localStorage
+  const savePasswords = (passwordList) => {
+    localStorage.setItem("passwordManager_vault", JSON.stringify(passwordList));
+    setPasswords(passwordList);
+  };
+
+  // Handle add password
+  const handleAddOrUpdate = () => {
+    if (!website || !password) {
+      alert("Please enter both app name and password");
+      return;
+    }
+
+    const mp = promptMasterPassword();
+    if (!mp) {
+      alert("Master password is required");
+      return;
+    }
+
+    try {
+      const { encrypted, salt } = encryptPassword(password, mp);
+
+      const newPassword = {
+        id: Date.now(),
+        website,
+        username,
+        encryptedPassword: encrypted,
+        salt,
+        createdAt: new Date().toISOString(),
+      };
+
+      const updatedPasswords = [...passwords, newPassword];
+      savePasswords(updatedPasswords);
+
+      // Clear form
+      setWebsite("");
+      setUsername("");
+      setPassword("");
+    } catch (error) {
+      alert("Error encrypting password: " + error.message);
+    }
+  };
+
+  // Toggle password visibility
+  const togglePasswordVisibility = (id) => {
+    // If already showing, just hide it
+    if (showPassword[id]) {
+      setShowPassword((prev) => ({
+        ...prev,
+        [id]: false,
+      }));
+      setDecryptedPasswords((prev) => {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
+      });
+      return;
+    }
+
+    // Otherwise, prompt for master password and decrypt
+    const mp = promptMasterPassword();
+    if (!mp) {
+      alert("Master password is required to view passwords");
+      return;
+    }
+
+    try {
+      const pwd = passwords.find((p) => p.id === id);
+      if (!pwd) return;
+
+      const decrypted = decryptPassword(pwd.encryptedPassword, pwd.salt, mp);
+
+      setDecryptedPasswords((prev) => ({
+        ...prev,
+        [id]: decrypted,
+      }));
+      setShowPassword((prev) => ({
+        ...prev,
+        [id]: true,
+      }));
+    } catch (error) {
+      alert("Error: " + error.message);
+    }
+  };
+
+  // Toggle expand/collapse
+  const toggleExpand = (id) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
+
+  // Copy password to clipboard
+  const copyToClipboard = (pwd) => {
+    const mp = promptMasterPassword();
+    if (!mp) {
+      alert("Master password is required");
+      return;
+    }
+
+    try {
+      const decrypted = decryptPassword(pwd.encryptedPassword, pwd.salt, mp);
+      navigator.clipboard.writeText(decrypted);
+      alert("Password copied to clipboard!");
+    } catch (error) {
+      alert("Error: " + error.message);
+    }
+  };
+
+  // Delete password
+  const handleDelete = (id) => {
+    if (window.confirm("Are you sure you want to delete this password?")) {
+      const updatedPasswords = passwords.filter((p) => p.id !== id);
+      savePasswords(updatedPasswords);
+    }
+  };
+
+  // Lock (clear master password from memory)
+  const handleLock = () => {
+    setMasterPassword("");
+    setShowPassword({});
+    setDecryptedPasswords({});
+    setExpandedId(null);
+    alert("Master password cleared from memory");
+  };
+
+  return (
+    <div className="counter-app">
+      <div className="todo-container">
+        <h1>Manager</h1>
+
+        {/* Add Password Form */}
+        <div className="pm-form">
+          <input
+            type="text"
+            className="pm-input"
+            placeholder="App Name"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            autoComplete="off"
+          />
+          <input
+            type="text"
+            className="pm-input"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="off"
+          />
+          <input
+            type="password"
+            className="pm-input"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAddOrUpdate();
+            }}
+          />
+          <div className="pm-actions">
+            <button className="add-button pm-btn" onClick={handleAddOrUpdate}>
+              Add
+            </button>
+            <button
+              className="add-button pm-btn"
+              onClick={handleLock}
+              style={{ backgroundColor: "#6c757d" }}
+            >
+              <MdLock /> Lock
+            </button>
+          </div>
+        </div>
+
+        {/* Password List */}
+        <div className="todo-list">
+          {passwords.length === 0 ? (
+            <p style={{ textAlign: "center", color: "#999" }}>
+              No passwords stored yet
+            </p>
+          ) : (
+            passwords.map((pwd) => (
+              <div key={pwd.id} className="todo-item pm-item">
+                {/* Collapsed View - App Name */}
+                <div
+                  onClick={() => toggleExpand(pwd.id)}
+                  style={{
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    fontWeight: "500",
+                  }}
+                >
+                  <span style={{ fontSize: "14px" }}>
+                    {expandedId === pwd.id ? "▼" : "▶"}
+                  </span>
+                  <span>{pwd.website}</span>
+                </div>
+
+                {/* Expanded View - Password Details */}
+                {expandedId === pwd.id && (
+                  <div className="pm-detail">
+                    {pwd.username && (
+                      <div className="pm-detail-row">
+                        <span className="pm-detail-label">Username</span>
+                        <span className="pm-detail-value">{pwd.username}</span>
+                      </div>
+                    )}
+
+                    <div className="pm-detail-row">
+                      <span className="pm-detail-label">Password</span>
+                      <span className="pm-detail-value">
+                        {showPassword[pwd.id]
+                          ? decryptedPasswords[pwd.id] || "••••••••"
+                          : "••••••••"}
+                      </span>
+                      <button
+                        className="pm-eye-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePasswordVisibility(pwd.id);
+                        }}
+                      >
+                        {showPassword[pwd.id] ? (
+                          <MdVisibilityOff />
+                        ) : (
+                          <MdVisibility />
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="pm-detail-actions">
+                      <button
+                        className="pm-detail-btn pm-detail-btn--copy"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyToClipboard(pwd);
+                        }}
+                      >
+                        <MdContentCopy /> Copy
+                      </button>
+
+                      <button
+                        className="pm-detail-btn pm-detail-btn--delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(pwd.id);
+                        }}
+                      >
+                        <MdDelete /> Delete
+                      </button>
+                    </div>
+
+                    <div className="pm-detail-date">
+                      Added: {new Date(pwd.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PasswordManagerComponent;
+
+
+//# DynamicTable.css
+
+/* General Styling */
+.table-container {
+  padding: 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+  font-family: Arial, sans-serif;
+}
+
+.form {
+  display: flex;
+  justify-content: flex-end; /* This will align the button to the left */
+  margin-bottom: 2rem;
+}
+
+h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+h3 {
+  margin-bottom: 10px;
+}
+
+/* Table Styling */
+.responsive-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  border: 1px solid #ccc;
+}
+
+.responsive-table th, .responsive-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border: 1px solid #ddd;
+}
+
+.responsive-table th {
+  background-color: #f4f4f4;
+}
+
+.responsive-table tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.responsive-table input {
+  width: 100%;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.responsive-table button {
+  padding: 5px 10px;
+  margin: 5px;
+  background-color: #4CAF50; /* Green color by default */
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  min-width: 80px; /* Ensure buttons don't shrink too much */
+}
+
+.responsive-table button:hover {
+  background-color: #45a049;
+}
+
+/* Specific Styling for Delete Button (Red Color) */
+.responsive-table .delete-btn {
+  background-color: red; /* Red color for delete */
+}
+
+.responsive-table .delete-btn:hover {
+  background-color: darkred; /* Darker red when hovered */
+}
+
+/* Flexbox for Action Buttons */
+.responsive-table .action-buttons {
+  display: flex;
+  justify-content: flex-start; /* Align buttons to the left */
+  gap: 10px; /* Space between buttons */
+  flex-wrap: nowrap; /* Prevent wrapping of buttons */
+}
+
+/* Input Form Styling */
+.form-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.form-container input {
+  padding: 10px;
+  margin: 5px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 48%;
+}
+
+.form-container button {
+  padding: 10px 20px;
+  margin-top: 10px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.form-container button:hover {
+  background-color: #45a049;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .form-container input {
+    width: 100%;
+    margin: 5px 0;
+  }
+
+  .form-container select {
+    width: 100%;
+    margin: 5px 0;
+  }
+
+  .form-container button {
+    width: 100%;
+  }
+
+  .responsive-table th, .responsive-table td {
+    padding: 8px 10px;
+  }
+
+  .responsive-table .action-buttons {
+    flex-wrap: wrap; /* Allow the buttons to wrap in smaller screens */
+    justify-content: space-between; /* Make sure buttons are spaced out */
+  }
+}
+
+/* Very Small Screens (<565px) */
+@media (max-width: 565px) {
+  .responsive-table .action-buttons {
+    flex-wrap: wrap; /* Allow wrapping */
+    justify-content: center; /* Center buttons when wrapping */
+    width: 100%; /* Ensure buttons take up full width */
+  }
+
+  .responsive-table .action-buttons button {
+    flex-grow: 1; /* Make buttons take equal space */
+    min-width: auto; /* Allow buttons to shrink if necessary */
+  }
+
+  .responsive-table th, .responsive-table td {
+    font-size: 14px;
+    padding: 5px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .table-container {
+    padding: 10px;
+  }
+  .responsive-table th, .responsive-table td {
+    font-size: 15px;
+  }
+}
+
+/* Dark mode overrides */
+body.dark-mode .responsive-table th,
+body.dark-mode .responsive-table td {
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+body.dark-mode .responsive-table th {
+  background-color: #2a2a3d;
+}
+
+body.dark-mode .responsive-table tr:nth-child(odd) {
+  background-color: #1e1e2e;
+}
+
+body.dark-mode .responsive-table tr:nth-child(even) {
+  background-color: #252535;
+  color: #e0e0e0;
+}
+
+
+//# CurrentMonthPaymentsTable.js
+
+import React, { useEffect, useState } from 'react';
+import '../App.css';
+import './DynamicTable.css';
+
+// Utility function to filter payments for the current month
+const getCurrentMonthPayments = (payments) => {
+  const currentMonth = new Date().getMonth();
+  return payments.filter(({ date }) => {
+    const paymentMonth = new Date(date).getMonth();
+    return paymentMonth === currentMonth;
+  });
+};
+
+const STORAGE_KEY = 'paymentDoneChecklist';
+
+const PaymentSummaryTable = ({ payments }) => {
+  const currentMonthPayments = getCurrentMonthPayments(payments);
+  const currentMonthName = new Date().toLocaleString('default', { month: 'long' });
+
+  const [doneMap, setDoneMap] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(doneMap));
+  }, [doneMap]);
+
+  const toggleDone = (key) => {
+    setDoneMap((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  return (
+    <div className="table-container">
+      <h3>Payments for {currentMonthName}</h3>
+      <table className="responsive-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Payment Type</th>
+            <th>papers</th>
+            <th>Date</th>
+            <th>Done</th>
+          </tr>
+        </thead>
+        <tbody>
+          {currentMonthPayments.length > 0 ? (
+            currentMonthPayments.map(({ name, paymentType, papers, date }, index) => {
+              const key = `${name}_${date}`;
+              const done = !!doneMap[key];
+              return (
+                <tr key={index} style={{ opacity: done ? 0.5 : 1 }}>
+                  <td style={{ textDecoration: done ? 'line-through' : 'none' }}>{name}</td>
+                  <td>{paymentType === 'm' ? 'Monthly' : 'Yearly'}</td>
+                  <td>{papers}</td>
+                  <td>{new Date(date).toLocaleDateString()}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={done}
+                      onChange={() => toggleDone(key)}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                  </td>
+                </tr>
+              );
+            })
+          ) : (
+            <tr>
+              <td colSpan="5">No payments for this month</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export default PaymentSummaryTable;
+
+
+//# src/App.js
+
+import { useEffect, useState } from "react";
+import { Route, Routes } from "react-router-dom";
+import "./App.css";
+import AddRowComponent from "./components/AddRowComponent";
+import DynamicTable from "./components/DynamicTable";
+import EditableTable from "./components/EditableTable";
+import EditRowComponent from "./components/EditRowComponent";
+import ImportLocalStorage from "./components/ImportLocalStorage";
+import MData from "./components/MData";
+import PasswordManagerComponent from "./components/PasswordManagerComponent";
+import SettingsComponent from "./components/SettingsComponent";
+import SyncComponent from "./components/SyncComponent";
+import Test from "./components/Test";
+import TilesComponent from "./components/TilesComponent";
+import TodoComponent from "./components/TodoComponent";
+
+function App() {
+  const [darkMode, setDarkMode] = useState(() => {
+    const savedMode = localStorage.getItem("darkMode");
+    return savedMode === "true";
+  });
+
+  // Apply dark mode class to body element
+  useEffect(() => {
+    if (darkMode) {
+      document.body.classList.add("dark-mode");
+    } else {
+      document.body.classList.remove("dark-mode");
+    }
+    localStorage.setItem("darkMode", darkMode);
+  }, [darkMode]);
+
+  const toggleDarkMode = () => {
+    setDarkMode((prevMode) => !prevMode);
+  };
+
+  const tiles = [
+    { path: "/today", label: "Today" },
+    { path: "/it", label: "IT" },
+    { path: "/stock", label: "Stock" },
+    { path: "/gold", label: "Gold" },
+    { path: "/real", label: "Real" },
+    { path: "/lending", label: "Lending" },
+    { path: "/password-manager", label: "Manager" },
+    { path: "/component-problems", label: "Solitude" },
+    { path: "/settings", label: "Settings" },
+  ];
+
+  const todayTiles = [
+    { path: "/component-bucket", label: "Bucket" },
+    { path: "/component-t", label: "Today" },
+    { path: "/mistake", label: "Mistake" },
+    { path: "/learning", label: "Learning" },
+    { path: "/personal-improvement", label: "Personal Improvement" },
+    { path: "/focus", label: "Focus" },
+    { path: "/goal", label: "Goal" },
+    { path: "/quotes", label: "Motivation" },
+    { path: "/family", label: "Family" },
+  ];
+
+  const stockTiles = [
+    { path: "/component-s", label: "Stock" },
+    { path: "/component-m", label: "MF" },
+    { path: "/stock-mistake", label: "Mistake" },
+    { path: "/stock-learning", label: "Learning" },
+  ];
+
+  const itTiles = [
+    { path: "/component-i-main", label: "IT Service" },
+    { path: "/it-mistake", label: "Mistake" },
+    { path: "/it-learning", label: "Learning" },
+  ];
+
+  const goldTiles = [
+    { path: "/component-g2-main", label: "Gold Service" },
+    { path: "/gold-mistake", label: "Mistake" },
+    { path: "/gold-learning", label: "Learning" },
+  ];
+
+  const realTiles = [
+    { path: "/component-r-main", label: "Real Service" },
+    { path: "/real-mistake", label: "Mistake" },
+    { path: "/real-learning", label: "Learning" },
+  ];
+
+  const lendingTiles = [
+    { path: "/component-l-main", label: "Lending Service" },
+    { path: "/lending-mistake", label: "Mistake" },
+    { path: "/lending-learning", label: "Learning" },
+  ];
+
+  const goalTiles = [
+    { path: "/today-goal", label: "Today" },
+    { path: "/week-goal", label: "Week" },
+    { path: "/month-goal", label: "Month" },
+  ];
+
+  return (
+    <div className="counter-app">
+      <Routes>
+        <Route
+          path="/"
+          element={<TilesComponent tiles={tiles} />}
+        />
+        <Route path="/today" element={<TilesComponent tiles={todayTiles} />} />
+        <Route path="/stock" element={<TilesComponent tiles={stockTiles} />} />
+        <Route path="/it" element={<TilesComponent tiles={itTiles} />} />
+        <Route path="/gold" element={<TilesComponent tiles={goldTiles} />} />
+        <Route path="/real" element={<TilesComponent tiles={realTiles} />} />
+        <Route
+          path="/lending"
+          element={<TilesComponent tiles={lendingTiles} />}
+        />
+        <Route path="/goal" element={<TilesComponent tiles={goalTiles} />} />
+        <Route
+          path="/settings"
+          element={
+            <SettingsComponent
+              darkMode={darkMode}
+              toggleDarkMode={toggleDarkMode}
+            />
+          }
+        />
+        <Route path="/sync" element={<SyncComponent />} />
+
+        {/* Password Manager route */}
+        <Route
+          path="/password-manager"
+          element={<PasswordManagerComponent />}
+        />
+
+        {/* Stock section routes */}
+        <Route path="/component-s" element={<MData />} />
+        <Route
+          path="/component-m"
+          element={<DynamicTable filter="mf" name="MF" />}
+        />
+        <Route
+          path="/stock-mistake"
+          element={
+            <TodoComponent filter="stock-mistake" name="Stock Mistakes" />
+          }
+        />
+        <Route
+          path="/stock-learning"
+          element={
+            <TodoComponent filter="stock-learning" name="Stock Learning" />
+          }
+        />
+
+        {/* IT section routes */}
+        <Route
+          path="/component-i-main"
+          element={<TodoComponent filter="it" name="IT-Service" />}
+        />
+        <Route
+          path="/it-mistake"
+          element={<TodoComponent filter="it-mistake" name="IT Mistakes" />}
+        />
+        <Route
+          path="/it-learning"
+          element={<TodoComponent filter="it-learning" name="IT Learning" />}
+        />
+
+        {/* Gold section routes */}
+        <Route path="/component-g2-main" element={<Test />} />
+        <Route
+          path="/gold-mistake"
+          element={<TodoComponent filter="gold-mistake" name="Gold Mistakes" />}
+        />
+        <Route
+          path="/gold-learning"
+          element={
+            <TodoComponent filter="gold-learning" name="Gold Learning" />
+          }
+        />
+
+        {/* Real section routes */}
+        <Route
+          path="/component-r-main"
+          element={<TodoComponent filter="real" name="R-Service" />}
+        />
+        <Route
+          path="/real-mistake"
+          element={
+            <TodoComponent filter="real-mistake" name="Real Estate Mistakes" />
+          }
+        />
+        <Route
+          path="/real-learning"
+          element={
+            <TodoComponent filter="real-learning" name="Real Estate Learning" />
+          }
+        />
+
+        {/* Lending section routes */}
+        <Route
+          path="/component-l-main"
+          element={<DynamicTable filter="lending" name="Lending" />}
+        />
+        <Route
+          path="/lending-mistake"
+          element={
+            <TodoComponent filter="lending-mistake" name="Lending Mistakes" />
+          }
+        />
+        <Route
+          path="/lending-learning"
+          element={
+            <TodoComponent filter="lending-learning" name="Lending Learning" />
+          }
+        />
+
+        {/* Legacy routes for backward compatibility */}
+        <Route path="/component-g2" element={<Test />} />
+        <Route
+          path="/component-r"
+          element={<TodoComponent filter="real" name="R-Service" />}
+        />
+        <Route
+          path="/component-i"
+          element={<TodoComponent filter="it" name="IT-Service" />}
+        />
+        <Route
+          path="/component-l"
+          element={<DynamicTable filter="lending" name="Lending" />}
+        />
+
+        <Route
+          path="/component-t"
+          element={<TodoComponent filter="today" name="Today" />}
+        />
+        <Route
+          path="/component-b"
+          element={<DynamicTable filter="bank" name="Bank" />}
+        />
+        <Route path="//importJson" element={<ImportLocalStorage />} />
+        <Route path="/add-row" element={<AddRowComponent name="Lending" />} />
+        <Route
+          path="/doc-details"
+          element={<EditableTable name="documents" />}
+        />
+        <Route path="/edit-row" element={<EditRowComponent />} />
+        {/* Additional Routes */}
+        <Route
+          path="/personal-improvement"
+          element={
+            <TodoComponent filter="personal-improvement" name="Improvement" />
+          }
+        />
+        <Route
+          path="/learning"
+          element={<TodoComponent filter="learning" name="Learning" />}
+        />
+        <Route
+          path="/mistake"
+          element={<TodoComponent filter="mistake" name="Mistake" />}
+        />
+        <Route
+          path="/focus"
+          element={<TodoComponent filter="focus" name="Focus" />}
+        />
+        <Route
+          path="/component-problems"
+          element={
+            <TodoComponent filter="problems" name="Tell me your Problems" />
+          }
+        />
+        <Route
+          path="/component-bucket"
+          element={<TodoComponent filter="bucket" name="Bucket" />}
+        />
+        <Route
+          path="/family"
+          element={<TodoComponent filter="family" name="Family goal" />}
+        />
+
+        <Route
+          path="/quotes"
+          element={<TodoComponent filter="quotes" name="Quotes" />}
+        />
+
+        {/* goal router */}
+        <Route
+          path="/today-goal"
+          element={<TodoComponent filter="t-goal" name="Now" />}
+        />
+        <Route
+          path="/week-goal"
+          element={<TodoComponent filter="w-goal" name="Week" />}
+        />
+        <Route
+          path="/month-goal"
+          element={<TodoComponent filter="=m-goal" name="Month" />}
+        />
+      </Routes>
+    </div>
+  );
+}
+
+export default App;
+
+
+
+//# App.css
+
+
+
+#root {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding-bottom: 2rem;
+  text-align: center;
+  /* background-color: #3c4f60; */
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.form-button {
+  display: flex;
+  justify-content: flex-start; /* Aligns the button to the left */
+  margin-bottom: 2rem;
+  margin-top: 10px;
+  color: #218838;
+}
+
+.add-row-form {
+  padding: 2rem;
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+.counter-app {
+  text-align: center;
+  margin-top: 50px;
+}
+
+.counter-app h1 {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+}
+
+.counter-app p {
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+}
+
+.counter-app button {
+  font-size: 1rem;
+  padding: 10px 20px;
+  margin: 0 10px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+
+.counter-app button:hover {
+  background-color: #c8ba53;
+}
+
+.tiles-container {
+  display: grid;
+  grid-template-columns: 1fr; /* Default: Single column on mobile */
+  gap: 30px;
+  padding: 20px;
+  /* min-height: 100vh;  */
+  /* background-color: #3c4f60; */
+}
+
+/* Two columns per row on screens wider than 375px */
+@media (min-width: 375px) {
+  .tiles-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Ensure minimum height for each tile */
+.tile {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #376c58;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  font-size: 1.2rem;
+  text-decoration: none;
+  color: white;
+  flex-grow: 0; /* Prevents stretching */
+  flex-shrink: 1; /* Allows shrinking if needed */
+  transition: background-color 0.3s ease;
+  min-height: 150px; /* Reasonable minimum height */
+  height: auto; /* Adapts to content */
+  max-height: 150px; /* Prevents tiles from being too large */
+}
+
+.quotes-container {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-left: 5px solid #376c58;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  font-style: italic;
+  color: #333;
+}
+
+.quotes-container p {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+
+
+.tile:hover {
+  background-color: rgba(38, 35, 35, 0.902); /* Softer hover effect */
+}
+
+@media (min-width: 600px) {
+  .tile {
+    padding: 30px; /* Increased padding for larger devices */
+    font-size: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .tile {
+    padding: 60px; /* Increased padding for large desktop view */
+    font-size: 4rem;
+  }
+}
+
+
+.add-button {
+  padding: 10px 20px;
+  background-color: #28a745;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.add-button:hover {
+  background-color: #218838;
+}
+
+.todo-input-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.todo-container {
+  max-width: 21.875rem;
+  margin: 0 auto;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+  text-align: center;
+}
+
+.todo-list .todo-number {
+  margin-right: 10px;
+  font-weight: bold;
+  color: #333;
+}
+
+.todo-list .remove-button {
+  margin: 10px 10px;
+  padding: 5px 10px;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.todo-input {
+  width: 80%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+/* Password Manager form */
+.pm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.pm-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.pm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.pm-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+/* Expanded detail view */
+.pm-detail {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+
+.pm-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.pm-detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-width: 72px;
+  flex-shrink: 0;
+}
+
+.pm-detail-value {
+  font-size: 14px;
+  font-family: monospace;
+  color: #333;
+  word-break: break-all;
+  flex: 1;
+}
+
+.pm-detail-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pm-detail-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.pm-detail-btn--show   { background-color: #28a745; }
+.pm-detail-btn--copy   { background-color: #007bff; }
+.pm-detail-btn--delete { background-color: #dc3545; }
+
+.pm-detail-date {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #bbb;
+  text-align: right;
+}
+
+.pm-eye-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  padding: 0 0 0 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.pm-eye-btn:hover {
+  color: #333;
+}
+
+/* IT Service Component */
+.it-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.it-tab-btn {
+  flex: 1;
+  padding: 10px;
+  border: 2px solid #ccc;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+}
+
+.it-tab-btn--active {
+  border-color: #28a745;
+  background-color: #28a745;
+  color: #fff;
+}
+
+.it-add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  align-items: flex-start;
+}
+
+.it-add-form input,
+.it-add-form select {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.it-note-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.it-notes-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.it-note-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: #f9f9f9;
+}
+
+.it-note-date {
+  font-size: 11px;
+  color: #999;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.it-note-text {
+  flex: 1;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+body.dark-mode .it-tab-btn {
+  border-color: #555;
+  color: #ccc;
+}
+
+body.dark-mode .it-tab-btn--active {
+  border-color: #28a745;
+  background-color: #28a745;
+  color: #fff;
+}
+
+body.dark-mode .it-add-form input,
+body.dark-mode .it-add-form select,
+body.dark-mode .it-note-input {
+  background: #2a2a3d;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+body.dark-mode .it-note-item {
+  background: #1e1e2e;
+  border-color: #444;
+}
+
+body.dark-mode .it-note-text {
+  color: #e0e0e0;
+}
+
+
+.todo-list {
+  list-style-type: none;
+  padding: 0;
+  margin-top: 20px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+  background-color: #f4f4f4;
+  padding: 10px;
+  border-radius: 5px;
+  width: 100%;
+  max-width: 25rem; /* Adjusted for responsiveness */
+  justify-content: center;
+}
+
+.pm-item {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  box-sizing: border-box;
+}
+
+.todo-number {
+  margin-right: 10px;
+  font-weight: bold;
+  color: #333;
+}
+
+.todo-text {
+  flex-grow: 1;
+  text-align: center;
+}
+
+.todo-item:last-child {
+  border-bottom: none;
+}
+
+.todo-details, .date-input {
+  margin-top: 10px;
+  background-color: #e9ecef;
+  padding: 10px;
+  border-radius: 5px;
+  width: 100%;
+  display: block;
+  max-height: 233px;
+  overflow: auto;
+  transition: max-height 0.5s ease-in-out; /* Improved animation */
+}
+
+.todo-detail-input {
+  width: 100%;
+  height: 100px;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.select-box {
+  word-wrap: normal;
+  width: 100%;
+  margin: 5px 0;
+  padding: 10px;
+}
+
+.score {
+  font-family: 'Arial', sans-serif;
+  font-size: 1rem;
+  color: #333;
+  background-color: #f4f4f4;
+  padding: 20px;
+  margin: 19px auto;
+  border-radius: 10px;
+  width: fit-content;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.score span {
+  display: block;
+  margin-top: 10px;
+  font-weight: bold;
+  color: #ff6347;
+}
+
+.score .result {
+  font-style: italic;
+  color: #2e8b57;
+}
+
+.problem-buttons {
+  padding-left: 10px;
+  text-align: right;
+  margin-top: 10px;
+  display: flex;
+  gap: 1rem; /* Optional: adjust spacing between buttons */
+}
+
+.copy-buttons {
+  padding-left: 10px;
+  text-align: right;
+  margin-top: 10px;
+}
+
+.button-icon {
+  margin: 6px;
+  padding: 7px;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.move-icon,
+.delete-icon {
+  font-size: 10px;  /* Increase as needed */
+}
+
+
+.nav-links {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin: 20px 0;
+}
+
+.nav-link {
+  padding: 10px 15px;
+  background-color: #4caf50;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.nav-link:hover {
+  background-color: #45a049;
+}
+
+/* Dark Mode Styles */
+body.dark-mode {
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+}
+
+body.dark-mode .counter-app {
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+}
+
+body.dark-mode .tile {
+  background-color: #2d3748;
+  color: #e0e0e0;
+  border-color: #4a5568;
+}
+
+body.dark-mode .tile:hover {
+  background-color: #4a5568;
+}
+
+body.dark-mode .quotes-container {
+  background-color: #2d3748;
+  border-left-color: #4299e1;
+  color: #e0e0e0;
+}
+
+body.dark-mode .todo-container {
+  background-color: #2d3748;
+  border-color: #4a5568;
+  color: #e0e0e0;
+}
+
+body.dark-mode .todo-item {
+  background-color: #1a202c;
+  color: #e0e0e0;
+}
+
+body.dark-mode .todo-number {
+  color: #e0e0e0;
+}
+
+body.dark-mode .todo-details,
+body.dark-mode .date-input {
+  background-color: #1a202c;
+  color: #e0e0e0;
+}
+
+body.dark-mode .todo-detail-input {
+  background-color: #2d3748;
+  color: #e0e0e0;
+  border-color: #4a5568;
+}
+
+body.dark-mode .select-box {
+  background-color: #2d3748;
+  color: #e0e0e0;
+  border-color: #4a5568;
+}
+
+body.dark-mode .score {
+  background-color: #2d3748;
+  color: #e0e0e0;
+}
+
+body.dark-mode .nav-link {
+  background-color: #2d3748;
+  border-color: #4a5568;
+}
+
+body.dark-mode .nav-link:hover {
+  background-color: #4a5568;
+}
+
+body.dark-mode table {
+  background-color: #2d3748;
+  color: #e0e0e0;
+}
+
+body.dark-mode th {
+  background-color: #1a202c;
+  color: #e0e0e0;
+}
+
+body.dark-mode td {
+  border-color: #4a5568;
+}
+
+body.dark-mode input,
+body.dark-mode textarea {
+  background-color: #2d3748;
+  color: #e0e0e0;
+  border-color: #4a5568;
+}
+
+body.dark-mode button {
+  background-color: #2d3748;
+  color: #e0e0e0;
+  border-color: #4a5568;
+}
+
+body.dark-mode .add-button {
+  background-color: #2d8659;
+}
+
+body.dark-mode .add-button:hover {
+  background-color: #25704d;
+}
+
+/* Settings Page Styles */
+.settings-page {
+  min-height: 100vh;
+}
+
+.settings-title {
+  font-size: 2rem;
+  margin: 20px 0;
+  color: #376c58;
+}
+
+body.dark-mode .settings-title {
+  color: #4299e1;
+}
+
+.settings-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.tile-icon {
+  font-size: 3rem;
+}
+
+.tile-label {
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+@media (min-width: 1024px) {
+  .tile-icon {
+    font-size: 4rem;
+  }
+
+  .tile-label {
+    font-size: 2rem;
+  }
+}
+
+/* Login Component Styles */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, #376c58 0%, #2d5547 100%);
+}
+
+body.dark-mode .login-container {
+  background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
+}
+
+.login-card {
+  background: white;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 450px;
+}
+
+body.dark-mode .login-card {
+  background: #2d3748;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.login-title {
+  text-align: center;
+  color: #376c58;
+  margin-bottom: 10px;
+  font-size: 2rem;
+}
+
+body.dark-mode .login-title {
+  color: #4299e1;
+}
+
+.login-subtitle {
+  text-align: center;
+  color: #666;
+  margin-bottom: 30px;
+  font-size: 1.3rem;
+  font-weight: 400;
+}
+
+body.dark-mode .login-subtitle {
+  color: #a0aec0;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #333;
+  font-size: 1rem;
+}
+
+body.dark-mode .form-group label {
+  color: #e0e0e0;
+}
+
+.login-input {
+  padding: 12px 16px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.3s;
+  background: white;
+  color: #333;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: #376c58;
+}
+
+body.dark-mode .login-input {
+  background: #1a202c;
+  border-color: #4a5568;
+  color: #e0e0e0;
+}
+
+body.dark-mode .login-input:focus {
+  border-color: #4299e1;
+}
+
+.login-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-button {
+  padding: 14px;
+  background-color: #376c58;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin-top: 10px;
+}
+
+.login-button:hover:not(:disabled) {
+  background-color: #2d5547;
+}
+
+.login-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+body.dark-mode .login-button {
+  background-color: #4299e1;
+}
+
+body.dark-mode .login-button:hover:not(:disabled) {
+  background-color: #3182ce;
+}
+
+.error-message {
+  background-color: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid #c33;
+  font-size: 0.95rem;
+}
+
+body.dark-mode .error-message {
+  background-color: #742a2a;
+  color: #feb2b2;
+  border-left-color: #fc8181;
+}
+
+.toggle-auth {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.toggle-button {
+  background: none;
+  border: none;
+  color: #376c58;
+  cursor: pointer;
+  font-size: 0.95rem;
+  text-decoration: underline;
+  padding: 5px;
+}
+
+.toggle-button:hover:not(:disabled) {
+  color: #2d5547;
+}
+
+.toggle-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+body.dark-mode .toggle-button {
+  color: #4299e1;
+}
+
+body.dark-mode .toggle-button:hover:not(:disabled) {
+  color: #63b3ed;
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 30px 20px;
+  }
+
+  .login-title {
+    font-size: 1.5rem;
+  }
+
+  .login-subtitle {
+    font-size: 1.1rem;
+  }
+}
+
+/* Sync Component Styles */
+.sync-page {
+  min-height: 100vh;
+}
+
+.sync-title {
+  font-size: 2rem;
+  margin: 20px 0 10px 0;
+  color: #376c58;
+}
+
+body.dark-mode .sync-title {
+  color: #4299e1;
+}
+
+.sync-description {
+  font-size: 1rem;
+  color: #666;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+body.dark-mode .sync-description {
+  color: #a0aec0;
+}
+
+.sync-tile {
+  position: relative;
+}
+
+.tile-description {
+  font-size: 0.9rem;
+  font-weight: 400;
+  opacity: 0.8;
+  margin-top: 5px;
+}
+
+.tile-disabled {
+  opacity: 0.6;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+.loading-indicator {
+  font-size: 0.85rem;
+  color: #376c58;
+  margin-top: 10px;
+  font-style: italic;
+}
+
+body.dark-mode .loading-indicator {
+  color: #4299e1;
+}
+
+@media (min-width: 1024px) {
+  .tile-description {
+    font-size: 1.2rem;
+  }
+}
+
+
+//# package.json
+
+{
+  "name": "library-management",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.7.9",
+    "bootstrap": "^5.3.2",
+    "crypto-js": "^4.2.0",
+    "firebase": "^12.11.0",
+    "react": "^18.2.0",
+    "react-beautiful-dnd": "^13.1.1",
+    "react-bootstrap": "^2.9.1",
+    "react-dom": "^18.2.0",
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^7.1.1",
+    "react-scripts": "5.0.1",
+    "react-table": "^7.8.0",
+    "web-vitals": "^2.1.4"
+  },
+  "homepage": ".",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "gh-pages": "^6.2.0"
+  }
+}
