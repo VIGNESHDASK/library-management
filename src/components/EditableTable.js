@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import "./DynamicTable.css";
+//
 
 // Predefined year ranges
 const yearRanges = [
