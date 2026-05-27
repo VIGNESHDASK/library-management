@@ -3,7 +3,7 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import '../App.css';
 import Scoreboard from './Scoreboard';
 import { MdDelete, MdDriveFileMove, MdContentCopy } from "react-icons/md";
-
+//
 // Helper to generate a unique ID
 const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 
