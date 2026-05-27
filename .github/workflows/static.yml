@@ -35,11 +35,13 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           node-version: '20'
-          
-      - name: run and build
+        
+      - name: install and build
         run: |
-              npm install
-              npm run build
+          npm install
+          export CI=false
+          npm run build
+
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
