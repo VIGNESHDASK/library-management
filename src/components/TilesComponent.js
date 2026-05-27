@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import '../App.css';
+//
 
 const TilesComponent = ({ tiles, isQuotesEnabled }) => {
   const [quotes, setQuotes] = useState([]);
