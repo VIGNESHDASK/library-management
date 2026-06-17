@@ -3,7 +3,7 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import '../App.css';
 import Scoreboard from './Scoreboard';
 import { MdDelete, MdDriveFileMove, MdContentCopy } from "react-icons/md";
-//
+
 // Helper to generate a unique ID
 const generateId = () => Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 
@@ -12,7 +12,11 @@ const useLocalStorage = (key, initialValue) => {
   const [value, setValueState] = useState(() => {
     try {
       const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
+      if (item === null || item === undefined || item === '') return initialValue;
+      const parsed = JSON.parse(item);
+      // If we expect an array but got something else, return initialValue
+      if (Array.isArray(initialValue) && !Array.isArray(parsed)) return initialValue;
+      return parsed;
     } catch (error) {
       console.error(`Error reading localStorage key "${key}":`, error);
       return initialValue;
@@ -52,18 +56,45 @@ const useDailyAchievementCount = (filter) => {
   return { todayCount, incrementCount };
 };
 
+// Helper: normalize a single raw todo entry into a proper object
+const normalizeTodo = (todo, index, savedDetails, savedDates) => {
+  if (typeof todo === 'string') {
+    return {
+      id: generateId(),
+      text: todo,
+      details: (Array.isArray(savedDetails) && savedDetails[index]) ? savedDetails[index] : '',
+      date: (Array.isArray(savedDates) && savedDates[index]) ? savedDates[index] : new Date().toISOString().split('T')[0]
+    };
+  }
+  // Already an object — ensure required fields exist
+  return {
+    id: todo.id || generateId(),
+    text: typeof todo.text === 'string' ? todo.text : '',
+    details: todo.details || '',
+    date: todo.date || new Date().toISOString().split('T')[0]
+  };
+};
+
 // Custom hook for managing unified todo items with Backward Compatibility Migration Layer
 const useTodoData = (filter) => {
   const [rawTodos, setRawTodos] = useLocalStorage(filter, []);
 
-  // Migration logic: If any todo item is a pure string, safely convert the whole list to objects
-  const todos = React.useMemo(() => {
-    if (!Array.isArray(rawTodos)) return [];
-    
-    const needsMigration = rawTodos.some(todo => typeof todo === 'string');
-    
+  // Run migration synchronously on first render if needed, persisting result immediately
+  const [todos, setTodosState] = useState(() => {
+    const raw = (() => {
+      try {
+        const item = localStorage.getItem(filter);
+        if (!item) return [];
+        const parsed = JSON.parse(item);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    })();
+
+    const needsMigration = raw.some(todo => typeof todo === 'string' || !todo.id || typeof todo.text !== 'string');
+
     if (needsMigration) {
-      // Pull historical details and dates arrays from old keys
       let savedDetails = [];
       let savedDates = [];
       try {
@@ -75,31 +106,40 @@ const useTodoData = (filter) => {
         console.error("Failed to parse old details/dates during migration", e);
       }
 
-      // Convert pure strings to unified objects matching old indexes
-      const migrated = rawTodos.map((todo, index) => {
-        if (typeof todo === 'string') {
-          return {
-            id: generateId(),
-            text: todo,
-            details: savedDetails[index] || '',
-            date: savedDates[index] || new Date().toISOString().split('T')[0]
-          };
-        }
-        return todo; // Already an object
-      });
+      const migrated = raw.map((todo, index) => normalizeTodo(todo, index, savedDetails, savedDates));
 
-      // Synchronize the converted data permanently back into localStorage
-      setTimeout(() => {
-        setRawTodos(migrated);
-      }, 0);
+      // Persist migration result immediately and synchronously
+      try {
+        localStorage.setItem(filter, JSON.stringify(migrated));
+      } catch (e) {
+        console.error("Failed to persist migrated todos", e);
+      }
 
       return migrated;
     }
 
-    return rawTodos;
-  }, [rawTodos, filter]);
+    return raw;
+  });
 
-  return { todos, setTodos: setRawTodos };
+  // Keep rawTodos (from useLocalStorage) and todosState in sync
+  useEffect(() => {
+    if (Array.isArray(rawTodos) && rawTodos !== todos) {
+      const needsMigration = rawTodos.some(todo => typeof todo === 'string' || !todo.id || typeof todo.text !== 'string');
+      if (!needsMigration) {
+        setTodosState(rawTodos);
+      }
+    }
+  }, [rawTodos]);
+
+  const setTodos = (newTodos) => {
+    const normalized = Array.isArray(newTodos)
+      ? newTodos.map((todo, index) => normalizeTodo(todo, index, [], []))
+      : [];
+    setRawTodos(normalized);
+    setTodosState(normalized);
+  };
+
+  return { todos, setTodos };
 };
 
 // Custom hook for problem-solving placeholder logic
@@ -265,7 +305,7 @@ const ReportDisplay = ({ report }) => {
 
 const TodoComponent = ({ filter, name }) => {
   const [inputValue, setInputValue] = useState('');
-  const [expandedId, setExpandedId] = useState(null); 
+  const [expandedId, setExpandedId] = useState(null);
   const [isHeading, setIsHeading] = useLocalStorage('problem-heading', '');
   const [reportGenerated, setReportGenerated] = useState(false);
   const [report, setReport] = useState(null);
@@ -315,8 +355,7 @@ const TodoComponent = ({ filter, name }) => {
     try {
       const existingCrossData = localStorage.getItem(crossFilterKey);
       let crossTodos = existingCrossData ? JSON.parse(existingCrossData) : [];
-      
-      // Safety fix: If the cross-filter target list also contains legacy strings, clean it up right here
+
       if (crossTodos.some(t => typeof t === 'string')) {
         crossTodos = crossTodos.map((t, idx) => typeof t === 'string' ? { id: generateId(), text: t, details: '', date: new Date().toISOString().split('T')[0] } : t);
       }
@@ -373,7 +412,7 @@ const TodoComponent = ({ filter, name }) => {
   return (
     <>
       <Scoreboard score={todayCount} />
-      
+
       <div className="todo-container">
         <TodoInput
           inputValue={inputValue}
@@ -384,7 +423,7 @@ const TodoComponent = ({ filter, name }) => {
           isProblem={isProblem}
           isHeading={isHeading}
         />
-        
+
         <DragDropContext onDragEnd={handleOnDragEnd}>
           <Droppable droppableId="todos">
             {(provided) => (
@@ -402,7 +441,7 @@ const TodoComponent = ({ filter, name }) => {
                         <span onClick={() => toggleTodoDetails(todo.id)} className="todo-text">
                           {todo.text}
                         </span>
-                        
+
                         <TodoItemActions
                           id={todo.id}
                           isBucket={isBucket}
@@ -411,7 +450,7 @@ const TodoComponent = ({ filter, name }) => {
                           onMove={moveTodo}
                           onRemove={removeTodo}
                         />
-                        
+
                         {expandedId === todo.id && (
                           <TodoDetails
                             todo={todo}
@@ -439,7 +478,7 @@ const TodoComponent = ({ filter, name }) => {
 
       {reportGenerated && report && (
         <div className="todo-container">
-          <ReportDisplay report={report}/>
+          <ReportDisplay report={report} />
         </div>
       )}
     </>
