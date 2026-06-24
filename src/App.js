@@ -43,7 +43,7 @@ function App() {
     { path: "/stock", label: "Stock" },
     { path: "/gold", label: "Gold" },
     { path: "/real", label: "Real" },
-    { path: "/lending", label: "Lending" },
+    { path: "/lending", label: "Banks" },
     { path: "/password-manager", label: "Manager" },
     { path: "/component-problems", label: "Solitude" },
     { path: "/settings", label: "Settings" },
@@ -56,7 +56,7 @@ function App() {
     { path: "/learning", label: "Learning" },
     { path: "/focus", label: "Focus" },
     { path: "/goal", label: "Goal" },
-    { path: "/personal-improvement", label: "Personal Improvement" },
+    { path: "/personal-improvement", label: "Improvement" },
     { path: "/quotes", label: "Motivation" },
     { path: "/family", label: "Family" },
   ];
@@ -88,7 +88,7 @@ function App() {
   ];
 
   const lendingTiles = [
-    { path: "/component-l-main", label: "Lending Service" },
+    { path: "/component-l-main", label: "Lending" },
     { path: "/bank", label: "Bank" },
     { path: "/mutual-fund", label: "mutual-fund" },
     { path: "/lending-mistake", label: "Mistake" },
