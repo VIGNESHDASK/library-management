@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Route, Routes } from "react-router-dom";
 import "./App.css";
@@ -7,6 +8,8 @@ import EditableTable from "./components/EditableTable";
 import EditRowComponent from "./components/EditRowComponent";
 import ImportLocalStorage from "./components/ImportLocalStorage";
 import MData from "./components/MData";
+import CalculatorComponent from "./components/CalculatorComponent";
+import BankComponent from "./components/BankComponent";
 import PasswordManagerComponent from "./components/PasswordManagerComponent";
 import SettingsComponent from "./components/SettingsComponent";
 import SyncComponent from "./components/SyncComponent";
@@ -51,9 +54,9 @@ function App() {
     { path: "/component-t", label: "Today" },
     { path: "/mistake", label: "Mistake" },
     { path: "/learning", label: "Learning" },
-    { path: "/personal-improvement", label: "Personal Improvement" },
     { path: "/focus", label: "Focus" },
     { path: "/goal", label: "Goal" },
+    { path: "/personal-improvement", label: "Personal Improvement" },
     { path: "/quotes", label: "Motivation" },
     { path: "/family", label: "Family" },
   ];
@@ -61,6 +64,7 @@ function App() {
   const stockTiles = [
     { path: "/component-s", label: "Stock" },
     { path: "/component-m", label: "MF" },
+    { path: "/calculator", label: "Calculator" },
     { path: "/stock-mistake", label: "Mistake" },
     { path: "/stock-learning", label: "Learning" },
   ];
@@ -85,6 +89,8 @@ function App() {
 
   const lendingTiles = [
     { path: "/component-l-main", label: "Lending Service" },
+    { path: "/bank", label: "Bank" },
+    { path: "/mutual-fund", label: "mutual-fund" },
     { path: "/lending-mistake", label: "Mistake" },
     { path: "/lending-learning", label: "Learning" },
   ];
@@ -98,10 +104,7 @@ function App() {
   return (
     <div className="counter-app">
       <Routes>
-        <Route
-          path="/"
-          element={<TilesComponent tiles={tiles} />}
-        />
+        <Route path="/" element={<TilesComponent tiles={tiles} />} />
         <Route path="/today" element={<TilesComponent tiles={todayTiles} />} />
         <Route path="/stock" element={<TilesComponent tiles={stockTiles} />} />
         <Route path="/it" element={<TilesComponent tiles={itTiles} />} />
@@ -131,6 +134,7 @@ function App() {
 
         {/* Stock section routes */}
         <Route path="/component-s" element={<MData />} />
+        <Route path="/calculator" element={<CalculatorComponent />} />
         <Route
           path="/component-m"
           element={<DynamicTable filter="mf" name="MF" />}
@@ -148,11 +152,6 @@ function App() {
           }
         />
 
-        {/* IT section routes */}
-        <Route
-          path="/component-i-main"
-          element={<TodoComponent filter="it" name="IT-Service" />}
-        />
         <Route
           path="/it-mistake"
           element={<TodoComponent filter="it-mistake" name="IT Mistakes" />}
@@ -197,6 +196,11 @@ function App() {
         <Route
           path="/component-l-main"
           element={<DynamicTable filter="lending" name="Lending" />}
+        />
+        <Route path="/bank" element={<BankComponent headLine="Bank" />} />
+        <Route
+          path="/mutual-fund"
+          element={<BankComponent headLine="Mutual Fund" />}
         />
         <Route
           path="/lending-mistake"
