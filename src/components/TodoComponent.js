@@ -4,6 +4,24 @@ import { MdContentCopy, MdDelete, MdDriveFileMove } from "react-icons/md";
 import "../App.css";
 import Scoreboard from "./Scoreboard";
 
+// Helper to normalize a todo item to a plain string
+const normalizeTodoItem = (item) => {
+  if (item === null || item === undefined) return "";
+  if (typeof item === "object") {
+    // Object shape: { id, text, details, date } or similar
+    return String(
+      item.text ?? item.label ?? item.value ?? JSON.stringify(item)
+    );
+  }
+  return String(item);
+};
+
+// Helper to normalize a todos array — ensures every element is a string
+const normalizeTodos = (arr) => {
+  if (!Array.isArray(arr)) return [];
+  return arr.map(normalizeTodoItem);
+};
+
 // Custom hook for localStorage management
 const useLocalStorage = (key, initialValue) => {
   const [value, setValue] = useState(() => {
@@ -29,13 +47,13 @@ const useLocalStorage = (key, initialValue) => {
 
 // Custom hook for managing daily achievement count
 const useDailyAchievementCount = (filter) => {
-  const today = new Date().toLocaleDateString('en-CA'); // local date YYYY-MM-DD
+  const today = new Date().toLocaleDateString("en-CA"); // local date YYYY-MM-DD
   const [achievementData, setAchievementData] = useLocalStorage(
     `${filter}-achievements`,
     {
       date: today,
       count: 0,
-    },
+    }
   );
 
   // Reset count if it's a new day
@@ -64,12 +82,16 @@ const useDailyAchievementCount = (filter) => {
 
 // Custom hook for managing todo data
 const useTodoData = (filter) => {
-  const [todos, setTodos] = useLocalStorage(filter, []);
+  const [rawTodos, setTodos] = useLocalStorage(filter, []);
   const [todoDetails, setTodoDetails] = useLocalStorage(
     `${filter}-details`,
-    [],
+    []
   );
   const [todoDates, setTodoDates] = useLocalStorage(`${filter}-dates`, []);
+
+  // Normalize: if any stored item is an object {id, text, details, date},
+  // extract its text so React can render it safely as a string.
+  const todos = normalizeTodos(rawTodos);
 
   return {
     todos,
@@ -83,18 +105,20 @@ const useTodoData = (filter) => {
 
 // Custom hook for cross-filter operations (bucket/today)
 const useCrossFilterData = (filter) => {
-  const [crossFilterTodos, setCrossFilterTodos] = useLocalStorage(
+  const [rawCrossFilterTodos, setCrossFilterTodos] = useLocalStorage(
     filter === "bucket" ? "today" : "bucket",
-    [],
+    []
   );
   const [crossFilterTodoDetails, setCrossFilterTodoDetails] = useLocalStorage(
     filter === "bucket" ? "today-details" : "bucket-details",
-    [],
+    []
   );
   const [crossFilterTodoDates, setCrossFilterTodoDates] = useLocalStorage(
     filter === "bucket" ? "today-dates" : "bucket-dates",
-    [],
+    []
   );
+
+  const crossFilterTodos = normalizeTodos(rawCrossFilterTodos);
 
   return {
     crossFilterTodos,
@@ -268,17 +292,6 @@ const TodoDetails = ({
     />
   </div>
 );
-
-// Component for achievement display
-// const AchievementBadge = ({ count }) => {
-//   if (count === 0) return null;
-
-//   return (
-//     <div className="achievement-badge">
-//       completed: {count}
-//     </div>
-//   );
-// };
 
 const ReportDisplay = ({ report }) => {
   const onCopy = () => {
@@ -534,9 +547,6 @@ const TodoComponent = ({ filter, name }) => {
         todayRemaining={filter === "today" ? todos.length : undefined}
       />
 
-      {/* Achievement Badge */}
-      {/* <AchievementBadge count={todayCount} /> */}
-
       <div className="todo-container">
         <TodoInput
           inputValue={inputValue}
@@ -627,3 +637,4 @@ const TodoComponent = ({ filter, name }) => {
 };
 
 export default TodoComponent;
+
